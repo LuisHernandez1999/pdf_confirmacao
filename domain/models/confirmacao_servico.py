@@ -1,18 +1,18 @@
 from sqlalchemy import Table, MetaData
-from sqlalchemy.orm import mapper, relationship
+from sqlalchemy.orm import registry
 from core.database import engine
-from domain.models.base import Base
 
 metadata = MetaData()
+
 confirmacao_servico_table = Table(
-    "confirmacao_servico",
+    "confirmacao_servico",  # nome exato do Django
     metadata,
-    autoload_with=engine,
+    autoload_with=engine,    # pega a tabela diretamente do banco
 )
+
+mapper_registry = registry()
 
 class ConfirmacaoServico:
     pass
 
-mapper(ConfirmacaoServico, confirmacao_servico_table, properties={
-    "imagens": relationship("ImagemConfirmacao", back_populates="confirmacao")
-})
+mapper_registry.map_imperatively(ConfirmacaoServico, confirmacao_servico_table)

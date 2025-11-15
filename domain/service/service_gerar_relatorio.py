@@ -1,29 +1,37 @@
+# domain/service/service_gerar_relatorio.py
+
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from domain.models.confirmacao_servico import ConfirmacaoServico
-from domain.models.imagem_confirmacao import ImagemConfirmacao
 from domain.models.relatorio_confirmacao import RelatorioConfirmacao
 
-def gerar_relatorio(db: Session, confirmacao_id: int, imagens_escolhidas: list[int]):
-    confirmacao = db.query(ConfirmacaoServico).filter_by(id=confirmacao_id).first()
-    if not confirmacao:
-        raise Exception("ConfirmacaoServico não encontrada")
+def gerar_relatorio(
+    db: Session,
+    confirmacao_tag: str,
+    imagem_antes_id: int,
+    imagem_depois_id: int,
+    observacao: str = None
+) -> RelatorioConfirmacao:
 
-    imagens = db.query(ImagemConfirmacao).filter(
-        ImagemConfirmacao.id.in_(imagens_escolhidas),
-        ImagemConfirmacao.confirmacao_id == confirmacao_id
-    ).all()
+    # Verifica se já existe relatório para a confirmação
+    relatorio_existente = db.query(RelatorioConfirmacao).filter(
+        RelatorioConfirmacao.confirmacao_tag == confirmacao_tag
+    ).first()
+    if relatorio_existente:
+        raise HTTPException(status_code=400, detail="Relatório já existe para esta confirmação.")
 
-    campos_antes = [img.imagem for img in imagens]
-    campos_depois = []  
+    if imagem_antes_id == imagem_depois_id:
+        raise HTTPException(status_code=400, detail="Imagem 'antes' e 'depois' não podem ser iguais.")
 
+    # Cria relatório
     relatorio = RelatorioConfirmacao(
-        tag_doc=confirmacao.tag_doc,
-        nome_vistoriador=confirmacao.nome_vistoriador,
-        campos_antes=campos_antes,
-        campos_depois=campos_depois,
+        confirmacao_tag=confirmacao_tag,
+        obs_antes=None,
+        obs_depois=None,
+        observacao=observacao
     )
 
     db.add(relatorio)
     db.commit()
     db.refresh(relatorio)
+
     return relatorio
