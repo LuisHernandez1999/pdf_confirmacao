@@ -1,15 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Literal
 import logging
 
 from core.database import get_db
-from domain.service.service_gerar_relatorio import gerar_relatorio, gerar_pdf_relatorio
+from domain.service.service_gerar_relatorio import gerar_relatorio, gerar_svg_relatorio
 
 router = APIRouter(prefix="/relatorio", tags=["Relatório"])
 logger = logging.getLogger("api.relatorio")
+
 
 class RelatorioCreateRequest(BaseModel):
     confirmacao_tag: str
@@ -24,8 +25,8 @@ class RelatorioCreateRequest(BaseModel):
 def criar_relatorio(
     payload: RelatorioCreateRequest,
     db: Session = Depends(get_db),
-    accept: Optional[str] = Header(default=None, alias="Accept"),  # AQUI É O SEGREDO
-    format: Optional[str] = Query(None, alias="format")
+    accept: Optional[str] = Header(default=None, alias="Accept"),
+    format: Optional[Literal["json", "svg"]] = Query(None, alias="format"),
 ):
     try:
         dados_relatorio = gerar_relatorio(
@@ -38,28 +39,25 @@ def criar_relatorio(
             observacao=payload.observacao
         )
 
-        # Agora sim ele detecta o header Accept corretamente
-        wants_pdf = (
-            (accept and "application/pdf" in accept.lower()) or
-            format == "pdf"
-        )
+        # Gera o SVG (sempre string)
+        svg_string: str = gerar_svg_relatorio(dados_relatorio)
 
-        if wants_pdf:
-            logger.info(f"GERANDO PDF - Relatório ID: {dados_relatorio['id']}")
-            pdf_buffer = gerar_pdf_relatorio(dados_relatorio)
-            pdf_buffer.seek(0)  # importante!
-
-            return StreamingResponse(
-                pdf_buffer,
-                media_type="application/pdf",
+        # Cliente quer SVG?
+        if format == "svg" or (accept and "image/svg+xml" in accept.lower()):
+            logger.info(f"Retornando SVG - {payload.confirmacao_tag}")
+            return Response(
+                content=svg_string,
+                media_type="image/svg+xml",
                 headers={
-                    "Content-Disposition": f'attachment; filename="relatorio_{payload.confirmacao_tag}.pdf"',
-                    "Cache-Control": "no-cache"
+                    "Content-Disposition": f'attachment; filename="relatorio_{payload.confirmacao_tag}.svg"',
+                    "Cache-Control": "no-cache",
                 }
             )
 
+        # Padrão: retorna JSON (com SVG embutido ou não — você escolhe)
+        dados_relatorio["svg"] = svg_string  # inclui o SVG no JSON (muito útil pro frontend!)
         return JSONResponse(content=dados_relatorio)
 
     except Exception as e:
         logger.exception("Erro fatal ao gerar relatório")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Erro ao gerar o relatório")
