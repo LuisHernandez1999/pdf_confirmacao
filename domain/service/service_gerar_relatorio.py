@@ -12,18 +12,8 @@ import requests
 from PIL import Image as PILImage
 import os
 from pathlib import Path
-import folium
-import time
-import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import os
-import base64
-import logging
-from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor
-import requests
-from PIL import Image
-from io import BytesIO
+
 
 logger = logging.getLogger("relatorio_service")
 if not logger.handlers:
