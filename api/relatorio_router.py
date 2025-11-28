@@ -6,9 +6,9 @@ from typing import List
 from typing import Optional, Literal
 import logging
 from pydantic import BaseModel
-from domain.service.service_create_relatorio import gerar_relatorio
+from service.service_create_relatorio import gerar_relatorio
 from core.database import get_db
-from domain.service.service_list_relatorio import (
+from service.service_list_relatorio import (
     gerar_relatorio_completo,
     gerar_pdf_relatorio_completo
 )
