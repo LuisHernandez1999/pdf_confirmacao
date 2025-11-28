@@ -1,4 +1,4 @@
-"""Estilos e configurações visuais para relatórios"""
+
 
 COLORS = {
     'primary': '#2D5016',

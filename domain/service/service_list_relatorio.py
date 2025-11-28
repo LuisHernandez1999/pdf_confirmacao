@@ -454,7 +454,7 @@ def gerar_relatorio_completo(db: Session) -> dict[str, str]:
             confirmacao_tag=primeira_tag,
             observacao=f"RELATÓRIO COMPLETO - {len(confirmacoes_validas)} registros - {datetime.now():%d/%m/%Y %H:%M}"
         )
-        db.add(relatorio)
+        db.get(relatorio)
         db.commit()
         db.refresh(relatorio)
 

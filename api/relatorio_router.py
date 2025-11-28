@@ -1,12 +1,14 @@
 # routers/relatorio_router.py
-from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from fastapi import APIRouter, HTTPException, Depends, Body,Query
 from fastapi.responses import Response, JSONResponse
 from sqlalchemy.orm import Session
+from typing import List
 from typing import Optional, Literal
 import logging
-
+from pydantic import BaseModel
+from domain.service.service_create_relatorio import gerar_relatorio
 from core.database import get_db
-from domain.service.service_gerar_relatorio import (
+from domain.service.service_list_relatorio import (
     gerar_relatorio_completo,
     gerar_pdf_relatorio_completo
 )
@@ -19,6 +21,10 @@ router = APIRouter(
 logger = logging.getLogger("api.relatorio")
 
 
+
+class RelatorioRequest(BaseModel):
+    imagens_antes_ids: List[int]
+    imagens_depois_ids: List[int]
 # ================================================
 # 1. RELATÓRIO INDIVIDUAL (ANTIGO - mantido por compatibilidade)
 # ================================================
@@ -31,34 +37,6 @@ logger = logging.getLogger("api.relatorio")
 # ================================================
 # 2. RELATÓRIO COMPLETO COM TODAS AS CONFIRMAÇÕES + CARROSSEL
 # ================================================
-@router.get("/completo")
-def relatorio_completo(db: Session = Depends(get_db)):
-    """
-    Gera o relatório completo com TODAS as confirmações do banco,
-    retorna HTML diretamente para visualização no navegador.
-    """
-    try:
-        resultado = gerar_relatorio_completo(db=db)
-        html_content: str = resultado["html"]
-        
-        logger.info(f"Relatório completo gerado - {resultado['total_confirmacoes']} confirmações")
-        
-        # Retorna HTML diretamente
-        return Response(
-            content=html_content,
-            media_type="text/html",
-            headers={
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0"
-            }
-        )
-
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        logger.exception("Erro ao gerar relatório completo")
-        raise HTTPException(status_code=500, detail="Erro interno ao gerar relatório completo")
 
 
 @router.get("/completo/download")
@@ -104,3 +82,36 @@ def relatorio_completo_pdf(db: Session = Depends(get_db)):
     except Exception as e:
         logger.exception("Erro ao gerar PDF do relatório")
         raise HTTPException(status_code=500, detail=f"Erro ao gerar PDF: {str(e)}")
+
+
+
+@router.post("/criar_relatorio")
+def criar_relatorio(
+    confirmacao_tag: str = Query(..., description="Tag de confirmação do relatório"),
+    payload: RelatorioRequest = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Gera um relatório com imagens antes/depois e salva no banco.
+    """
+    if payload is None:
+        raise HTTPException(status_code=400, detail="Body JSON com arrays é obrigatório.")
+
+    try:
+        resultado = gerar_relatorio(
+            db=db,
+            confirmacao_tag=confirmacao_tag,
+            imagens_antes_ids=payload.imagens_antes_ids,
+            imagens_depois_ids=payload.imagens_depois_ids
+        )
+
+        logger.info(f"Relatório criado para TAG {confirmacao_tag}")
+
+        return JSONResponse(content=resultado)
+
+    except HTTPException as he:
+        raise he
+
+    except Exception as e:
+        logger.exception("Erro ao criar relatório")
+        raise HTTPException(status_code=500, detail=str(e))
