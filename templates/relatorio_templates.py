@@ -1,175 +1,373 @@
-"""Templates HTML e SVG para relatórios"""
+"""
+Templates e componentes visuais para geração de PDFs
+"""
+import base64
+from io import BytesIO
+from datetime import datetime, date
+from reportlab.platypus import Paragraph, Table, TableStyle, Spacer
+from reportlab.lib.units import mm
+from reportlab.lib.colors import HexColor, white
+from reportlab.pdfgen import canvas as pdfcanvas
+from reportlab.lib.pagesizes import landscape, A4
+import logging
+from PIL import Image as PILImage
 
-from datetime import datetime
-from domain.templates.relatorio_styles import (
-    COLORS, CARD_WIDTH, CARD_HEIGHT, CARD_IMAGE_HEIGHT,
-    PAGE_WIDTH, HEADER_HEIGHT, FOOTER_HEIGHT,
-    get_html_styles, get_svg_defs, get_svg_script
+from domain.models.confirmacao_servico import ConfirmacaoServico
+from domain.models.imagem_confirmacao import ImagemConfirmacao
+from templates.relatorio_styles import (
+    get_styles, 
+    get_card_colors, 
+    LOGO_PATH, 
+    FUNDO_PATH,
+    COLORS
 )
 
+logger = logging.getLogger("relatorio_template")
 
-def gerar_svg_header(logo_base64: str | None, total: int) -> str:
-    """Gera o cabeçalho SVG"""
-    header = f'<rect x="0" y="0" width="{PAGE_WIDTH}" height="{HEADER_HEIGHT}" fill="rgba(255,255,255,0.95)" filter="url(#sombra)"/>'
+def criar_header_completo(total_confirmacoes: int, total_cards: int, data_inicial: date | None, data_final: date | None):
+    """
+    Cria o header completo do PDF com logo, título e contadores
+    
+    Args:
+        total_confirmacoes: Número total de confirmações
+        total_cards: Número total de imagens
+        data_inicial: Data inicial do filtro (opcional)
+        data_final: Data final do filtro (opcional)
+    
+    Returns:
+        Lista de elementos do platypus para adicionar à story
+    """
+    from reportlab.platypus import Image as RLImage
+    from reportlab.lib.utils import ImageReader
+    
+    styles = get_styles()
+    colors = get_card_colors()
+    elements = []
+    
+    # Carregar logo
+    logo_base64 = _encode_image_base64(str(LOGO_PATH))
     
     if logo_base64:
-        header += f'''
-            <g>
-                <image href="data:image/png;base64,{logo_base64}" x="50" y="30" width="100" height="100" preserveAspectRatio="xMidYMid meet"/>
-                <text x="100" y="155" font-size="18" font-weight="bold" text-anchor="middle" fill="{COLORS['primary']}">Consórcio LimpaGyn</text>
-            </g>
-        '''
-    
-    header += f'''
-        <text x="{PAGE_WIDTH/2}" y="70" font-size="42" font-weight="bold" text-anchor="middle" fill="{COLORS['primary']}">RELATÓRIO CONFIRMAÇÃO SERVIÇO</text>
-        <text x="{PAGE_WIDTH/2}" y="115" font-size="22" text-anchor="middle" fill="{COLORS['primary']}" opacity="0.95">Confirmações neste Relatório: {total}</text>
-        <text x="{PAGE_WIDTH/2}" y="150" font-size="16" text-anchor="middle" fill="{COLORS['primary']}" opacity="0.85">Gerado em: {datetime.now().strftime("%d/%m/%Y")}</text>
-    '''
-    
-    return header
-
-
-def gerar_svg_footer(page_height: int) -> str:
-    """Gera o rodapé SVG"""
-    footer_y = page_height - FOOTER_HEIGHT
-    return f'''
-        <rect x="0" y="{footer_y}" width="{PAGE_WIDTH}" height="{FOOTER_HEIGHT}" fill="rgba(255,255,255,0.95)" filter="url(#sombra)"/>
-        <text x="{PAGE_WIDTH/2}" y="{footer_y + 35}" font-size="20" font-weight="bold" text-anchor="middle" fill="{COLORS['primary']}">Consórcio LimpaGyn</text>
-        <text x="{PAGE_WIDTH/2}" y="{footer_y + 60}" font-size="14" text-anchor="middle" fill="{COLORS['secondary']}">Relatório gerado automaticamente</text>
-    '''
-
-
-def gerar_card_svg(confirmacao, card_id: str, x: int, y: int, imagens_b64: list[str]) -> str:
-    """Gera um card SVG com informações da confirmação"""
-    total_imagens = len(imagens_b64)
-    
-    linhas = [f'<g transform="translate({x},{y})">']
-    linhas.append(f'<rect x="0" y="0" width="{CARD_WIDTH}" height="{CARD_HEIGHT}" fill="white" stroke="{COLORS["border"]}" stroke-width="2" rx="12" filter="url(#sombra)"/>')
-
-    # === IMAGENS COM CLIPPING ===
-    if imagens_b64:
-        linhas.append(f'<clipPath id="clip_{card_id}"><rect x="10" y="10" width="{CARD_WIDTH-20}" height="{CARD_IMAGE_HEIGHT}" rx="10"/></clipPath>')
-        linhas.append(f'<g clip-path="url(#clip_{card_id})"><g id="slides_{card_id}">')
-        for i, img64 in enumerate(imagens_b64):
-            linhas.append(f'<image x="{10 + i * (CARD_WIDTH-20)}" y="10" width="{CARD_WIDTH-20}" height="{CARD_IMAGE_HEIGHT}" href="{img64}" preserveAspectRatio="xMidYMid slice"/>')
-        linhas.append('</g></g>')
-
-        # BOTÕES DE NAVEGAÇÃO
-        if total_imagens > 1:
-            linhas.append(f'''
-                <g onclick="navegar('{card_id}', -1)" style="cursor:pointer"><circle cx="35" cy="{CARD_IMAGE_HEIGHT/2 + 10}" r="22" fill="{COLORS["primary"]}" opacity="0.8"/><text x="35" y="{CARD_IMAGE_HEIGHT/2 + 18}" font-size="28" fill="white" text-anchor="middle">‹</text></g>
-                <g onclick="navegar('{card_id}', 1)" style="cursor:pointer"><circle cx="{CARD_WIDTH-35}" cy="{CARD_IMAGE_HEIGHT/2 + 10}" r="22" fill="{COLORS["primary"]}" opacity="0.8"/><text x="{CARD_WIDTH-35}" y="{CARD_IMAGE_HEIGHT/2 + 18}" font-size="28" fill="white" text-anchor="middle">›</text></g>
-                <text id="contador_{card_id}" x="{CARD_WIDTH/2}" y="{CARD_IMAGE_HEIGHT + 35}" font-size="13" text-anchor="middle" fill="{COLORS["text"]}">1 / {total_imagens}</text>
-            ''')
+        logo_data = base64.b64decode(logo_base64)
+        logo_img = RLImage(BytesIO(logo_data), width=42*mm, height=42*mm)
+        
+        company_info = [
+            [Paragraph("Consórcio LimpaGyn", styles['company_name'])],
+            [Paragraph("Relatórios de Serviço Profissionais", styles['tagline'])]
+        ]
+        company_info_table = Table(company_info, colWidths=[80*mm])
+        company_info_table.setStyle(TableStyle([
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 0),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ('TOPPADDING', (0, 0), (-1, -1), 0),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 0),
+        ]))
+        
+        header_left_content = [[logo_img, company_info_table]]
+        header_left = Table(header_left_content, colWidths=[45*mm, 80*mm])
+        header_left.setStyle(TableStyle([
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+            ('ALIGN', (1, 0), (1, 0), 'LEFT'),
+            ('LEFTPADDING', (0, 0), (-1, -1), 2*mm),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 3*mm),
+            ('TOPPADDING', (0, 0), (-1, -1), 2*mm),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 2*mm),
+        ]))
     else:
-        linhas.append(f'''
-            <rect x="10" y="10" width="{CARD_WIDTH-20}" height="{CARD_IMAGE_HEIGHT}" fill="{COLORS["light"]}" rx="10"/>
-            <text x="{CARD_WIDTH/2}" y="{CARD_IMAGE_HEIGHT/2 + 10}" font-size="18" font-weight="bold" text-anchor="middle" fill="#e74c3c">SEM IMAGENS</text>
-        ''')
-
-    # === INFORMAÇÕES DO CARD ===
-    y_info = 250
-    tag_doc = confirmacao.tag_doc or "NULO"
-    linhas.append(f'<rect x="10" y="{y_info}" width="{CARD_WIDTH-20}" height="34" fill="{COLORS["primary"]}" rx="8"/>')
-    linhas.append(f'<text x="{CARD_WIDTH/2}" y="{y_info+22}" font-size="13" font-weight="bold" text-anchor="middle" fill="white">DOC: {tag_doc}</text>')
-
-    y_info += 50
-
-    dados = [
-        ("Vistoriador", confirmacao.nome_vistoriador or "NULO"),
-        ("Serviço", confirmacao.tipo_servico or "NULO"),
-        ("Data", confirmacao.data_servico.strftime("%d/%m/%Y") if confirmacao.data_servico else "NULO"),
+        header_left = Paragraph("Consórcio LimpaGyn", styles['company_name'])
+    
+    titulo_content = [
+        [Paragraph("RELATÓRIO COMPLETO", styles['titulo_principal'])],
+        [Paragraph("Confirmações de Serviço", styles['subtitulo'])]
     ]
-
-    for rotulo, valor in dados:
-        linhas.append(f'<text x="15" y="{y_info}" font-size="11" fill="{COLORS["primary"]}" font-weight="bold">{rotulo}:</text>')
-        linhas.append(f'<text x="15" y="{y_info+18}" font-size="15" fill="{COLORS["text"]}" font-weight="bold">{valor}</text>')
-        y_info += 40
-
-    # LOCALIZAÇÃO
-    if confirmacao.latitude and confirmacao.longitude:
-        link = f"https://www.google.com/maps?q={confirmacao.latitude},{confirmacao.longitude}"
-        linhas.append(f'''
-            <text x="15" y="{y_info}" font-size="11" fill="{COLORS["primary"]}" font-weight="bold">Localização:</text>
-            <a href="{link}" target="_blank">
-                <rect x="15" y="{y_info+10}" width="{CARD_WIDTH-30}" height="40" fill="{COLORS["light"]}" stroke="{COLORS["accent"]}" stroke-width="2" rx="8"/>
-                <text x="{CARD_WIDTH/2}" y="{y_info+33}" font-size="11" text-anchor="middle" fill="{COLORS["text"]}">📍 {confirmacao.latitude:.6f}, {confirmacao.longitude:.6f}</text>
-            </a>
-        ''')
-    else:
-        linhas.append(f'<text x="15" y="{y_info}" font-size="13" fill="#e74c3c" font-weight="bold">Localização: NULO</text>')
-
-    linhas.append('</g>')
-    return "\n".join(linhas)
-
-
-def gerar_html_header(logo_base64: str | None, fundo_base64: str | None, total: int) -> str:
-    """Gera o cabeçalho HTML"""
-    background_img = f'<img src="data:image/jpeg;base64,{fundo_base64}" alt="" class="background">' if fundo_base64 else ''
-    logo_section = f'<div class="header-logo-section"><img src="data:image/png;base64,{logo_base64}" alt="LimpGyn Logo" class="header-logo"><div class="company-name">Consórcio LimpaGyn</div></div>' if logo_base64 else ''
+    titulo_table = Table(titulo_content, colWidths=[100*mm])
+    titulo_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 3*mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3*mm),
+    ]))
     
-    return f'''<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Relatório Completo</title>
-    <style>
-        {get_html_styles()}
-    </style>
-</head>
-<body>
-    {background_img}
-    <div class="container">
-        <div class="header">
-            {logo_section}
-            <div class="header-content">
-                <h1>RELATÓRIO COMPLETO</h1>
-                <p>Confirmações neste Relatório: {total}</p>
-                <p style="font-size: 0.9em; opacity: 0.8;">Gerado em: {datetime.now().strftime("%d/%m/%Y")}</p>
-            </div>
-        </div>
-    '''
+    data_geracao = datetime.now().strftime('%d/%m/%Y')
+    hora_geracao = datetime.now().strftime('%H:%M')
+    data_content = [
+        [Paragraph(data_geracao, styles['data_grande'])],
+        [Paragraph(hora_geracao, styles['hora_pequena'])]
+    ]
+    data_table = Table(data_content, colWidths=[40*mm])
+    data_table.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'RIGHT'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 2*mm),
+    ]))
+    
+    main_header = Table(
+        [[header_left, titulo_table, data_table]], 
+        colWidths=[128*mm, 100*mm, 42*mm]
+    )
+    main_header.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN', (0, 0), (0, 0), 'LEFT'),
+        ('ALIGN', (1, 0), (1, 0), 'CENTER'),
+        ('ALIGN', (2, 0), (2, 0), 'RIGHT'),
+    ]))
+    
+    elements.append(main_header)
+    elements.append(Spacer(1, 12*mm))
+    
+    contadores = criar_contadores(total_confirmacoes, total_cards, data_inicial, data_final)
+    elements.append(contadores)
+    elements.append(Spacer(1, 12*mm))
+    
+    separador = Table([['']], colWidths=[260*mm], rowHeights=[1.5])
+    separador.setStyle(TableStyle([
+        ('LINEABOVE', (0, 0), (-1, 0), 2.5, colors['separador']),
+    ]))
+    elements.append(separador)
+    elements.append(Spacer(1, 10*mm))
+    
+    return elements
 
+def criar_contadores(total_confirmacoes: int, total_cards: int, data_inicial: date | None, data_final: date | None):
+    """
+    Cria os cards de contadores com cores
+    
+    Args:
+        total_confirmacoes: Número de confirmações
+        total_cards: Número de imagens
+        data_inicial: Data inicial do período
+        data_final: Data final do período
+    
+    Returns:
+        Table com os três contadores
+    """
+    styles = get_styles()
+    colors = get_card_colors()
+    
+    contador_confirmacoes = [
+        [Paragraph(str(total_confirmacoes), styles['contador_numero'])],
+        [Paragraph("CONFIRMAÇÕES", styles['contador_label'])]
+    ]
+    
+    contador_imagens = [
+        [Paragraph(str(total_cards), styles['contador_numero'])],
+        [Paragraph("IMAGENS", styles['contador_label'])]
+    ]
+    
+    periodo_display = ""
+    if data_inicial and data_final:
+        periodo_display = f"{data_inicial.strftime('%d/%m/%Y')} - {data_final.strftime('%d/%m/%Y')}"
+    elif data_inicial:
+        periodo_display = f"A partir de {data_inicial.strftime('%d/%m/%Y')}"
+    elif data_final:
+        periodo_display = f"Até {data_final.strftime('%d/%m/%Y')}"
+    else:
+        periodo_display = "Todos os períodos"
+    
+    contador_periodo = [
+        [Paragraph("📅", styles['icon_style'])],
+        [Paragraph(periodo_display, styles['periodo_text'])]
+    ]
+    
+    table_conf = Table(contador_confirmacoes, colWidths=[70*mm])
+    table_conf.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors['contador_azul']),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOX', (0, 0), (-1, -1), 2, colors['borda_azul']),
+        ('TOPPADDING', (0, 0), (-1, -1), 6*mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6*mm),
+        ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+    ]))
+    
+    table_img = Table(contador_imagens, colWidths=[70*mm])
+    table_img.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors['contador_verde']),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOX', (0, 0), (-1, -1), 2, colors['borda_verde']),
+        ('TOPPADDING', (0, 0), (-1, -1), 6*mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6*mm),
+        ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+    ]))
+    
+    table_periodo = Table(contador_periodo, colWidths=[90*mm])
+    table_periodo.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), colors['contador_amarelo']),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('BOX', (0, 0), (-1, -1), 2, colors['borda_amarela']),
+        ('TOPPADDING', (0, 0), (-1, -1), 6*mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6*mm),
+        ('ROUNDEDCORNERS', [10, 10, 10, 10]),
+    ]))
+    
+    contadores_row = Table(
+        [[table_conf, table_img, table_periodo]], 
+        colWidths=[75*mm, 75*mm, 95*mm],
+        spaceBefore=0,
+        spaceAfter=0
+    )
+    contadores_row.setStyle(TableStyle([
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 5*mm),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 5*mm),
+    ]))
+    
+    return contadores_row
 
-def gerar_html_footer() -> str:
-    """Gera o rodapé HTML"""
-    return '''
-    <div class="footer">
-        <h3>Consórcio LimpaGyn</h3>
-        <p>Relatório gerado automaticamente</p>
-    </div>
-    </div>
-    </body>
-    </html>
-    '''
+def criar_card_individual(conf: ConfirmacaoServico, img: ImagemConfirmacao | None) -> Table:
+    """
+    Cria um card individual formatado para o PDF
+    
+    Args:
+        conf: Confirmação de serviço
+        img: Imagem da confirmação (opcional)
+    
+    Returns:
+        Table formatada como card
+    """
+    styles = get_styles()
+    colors = get_card_colors()
+    
+    # Preparar dados
+    tag_doc = conf.tag_doc or "NULO"
+    vistoriador = conf.nome_vistoriador or "NULO"
+    servico = conf.tipo_servico or "NULO"
+    data = conf.data_servico.strftime("%d/%m/%Y") if conf.data_servico else "NULO"
+    
+    # Status de imagem
+    if img and img.imagem:
+        status_img = "📷 Imagem disponível"
+        cor_status = colors['accent']
+    else:
+        status_img = "❌ SEM IMAGEM"
+        cor_status = colors['erro']
+    
+    # Localização
+    if img and img.latitude and img.longitude:
+        localizacao = f"📍 {img.latitude:.6f}, {img.longitude:.6f}"
+    else:
+        localizacao = "📍 Localização: NULO"
+    
+    # Criar conteúdo do card
+    status_style = styles['card_status'].clone('StatusClone')
+    status_style.textColor = cor_status
+    
+    card_content = [
+        [Paragraph(f"DOC: {tag_doc}", styles['card_doc'])],
+        [Paragraph(status_img, status_style)],
+        [Paragraph("Vistoriador:", styles['card_label'])],
+        [Paragraph(vistoriador, styles['card_valor'])],
+        [Paragraph("Serviço:", styles['card_label'])],
+        [Paragraph(servico, styles['card_valor'])],
+        [Paragraph("Data:", styles['card_label'])],
+        [Paragraph(data, styles['card_valor'])],
+        [Paragraph(localizacao, styles['card_localizacao'])],
+    ]
+    
+    # Criar tabela do card
+    card_table = Table(
+        card_content,
+        colWidths=[78*mm],
+        rowHeights=[10*mm, 6*mm, 4*mm, 6*mm, 4*mm, 6*mm, 4*mm, 6*mm, 8*mm]
+    )
+    
+    # Aplicar estilo visual ao card
+    card_table.setStyle(TableStyle([
+        ('BOX', (0, 0), (-1, -1), 2, colors['borda']),
+        ('ROUNDEDCORNERS', [5, 5, 5, 5]),
+        ('BACKGROUND', (0, 0), (-1, 0), colors['primaria']),
+        ('TEXTCOLOR', (0, 0), (-1, 0), white),
+        ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, 0), 'MIDDLE'),
+        ('BACKGROUND', (0, 1), (-1, 1), colors['fundo_claro']),
+        ('ALIGN', (0, 1), (-1, 1), 'CENTER'),
+        ('BACKGROUND', (0, 2), (-1, -2), white),
+        ('LEFTPADDING', (0, 2), (-1, -2), 3*mm),
+        ('RIGHTPADDING', (0, 2), (-1, -2), 3*mm),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('BACKGROUND', (0, -1), (-1, -1), colors['fundo_claro']),
+        ('ALIGN', (0, -1), (-1, -1), 'CENTER'),
+        ('TOPPADDING', (0, 0), (-1, -1), 2*mm),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 2*mm),
+    ]))
+    
+    return card_table
 
+def adicionar_background_e_footer(canvas, doc):
+    """
+    Callback para adicionar imagem de fundo e footer em cada página do PDF
+    
+    Args:
+        canvas: Canvas do ReportLab
+        doc: Documento do ReportLab
+    """
+    try:
+        if FUNDO_PATH.exists():
+            canvas.saveState()
+            
+            width, height = landscape(A4)
+            
+            # Abrir imagem para obter dimensões originais
+            img = PILImage.open(str(FUNDO_PATH))
+            img_width, img_height = img.size
+            img_ratio = img_width / img_height
+            page_ratio = width / height
+            
+            # Calcular dimensões mantendo aspect ratio
+            if img_ratio > page_ratio:
+                draw_height = height
+                draw_width = height * img_ratio
+                x = -(draw_width - width) / 2
+                y = 0
+            else:
+                draw_width = width
+                draw_height = width / img_ratio
+                x = 0
+                y = -(draw_height - height) / 2
+            
+            # Desenhar imagem de fundo
+            canvas.drawImage(
+                str(FUNDO_PATH), 
+                x, y, 
+                width=draw_width, 
+                height=draw_height,
+                mask='auto'
+            )
+            
+            # Adicionar footer
+            canvas.setFillColor(HexColor(COLORS['primary']))
+            canvas.setFont('Helvetica-Bold', 16)
+            canvas.drawCentredString(width / 2, 15*mm, "Consórcio LimpaGyn")
+            
+            canvas.setFillColor(HexColor(COLORS['secondary']))
+            canvas.setFont('Helvetica', 10)
+            canvas.drawCentredString(width / 2, 10*mm, "Relatório gerado automaticamente")
+            
+            canvas.restoreState()
+    except Exception as e:
+        logger.error(f"Erro ao adicionar fundo e footer ao PDF: {e}")
 
-def gerar_html_pagination_script(total_paginas: int) -> str:
-    """Gera o JavaScript para paginação"""
-    return f'''
-    <script>
-        let paginaAtual = 0;
-        const totalPaginas = {total_paginas};
+def _encode_image_base64(image_path: str) -> str | None:
+    """Codifica imagem em base64"""
+    import os
+    import traceback
+    
+    try:
+        if not os.path.exists(image_path):
+            logger.error(f"Arquivo não encontrado: {image_path}")
+            return None
         
-        function mudarPagina(direcao) {{
-            paginaAtual += direcao;
-            
-            if (paginaAtual < 0) paginaAtual = 0;
-            if (paginaAtual >= totalPaginas) paginaAtual = totalPaginas - 1;
-            
-            document.querySelectorAll('.pagina').forEach((p, i) => {{
-                p.classList.toggle('ativa', i === paginaAtual);
-            }});
-            
-            document.getElementById('page-info').textContent = 
-                'Página ' + (paginaAtual + 1) + ' de ' + totalPaginas;
-            
-            document.getElementById('btn-anterior').disabled = paginaAtual === 0;
-            document.getElementById('btn-proximo').disabled = paginaAtual === totalPaginas - 1;
-        }}
-        
-        // Inicializar paginação
-        mudarPagina(0);
-    </script>
-    '''
+        with open(image_path, 'rb') as f:
+            encoded = base64.b64encode(f.read()).decode('utf-8')
+            logger.info(f"Imagem codificada com sucesso: {len(encoded)} caracteres")
+            return encoded
+    except Exception as e:
+        logger.error(f"Erro ao carregar imagem: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return None

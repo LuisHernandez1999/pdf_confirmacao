@@ -1,227 +1,204 @@
+"""
+Estilos e configurações visuais para os relatórios em PDF
+"""
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.colors import HexColor, white, black
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
+from pathlib import Path
+import os
 
+# Caminhos para recursos
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FUNDO_PATH = Path(__file__).resolve().parents[1] / "imagens" / "planejamento_limpa.png"
+LOGO_PATH = Path(__file__).resolve().parents[1] / "imagens" / "limpalogo.png"
 
 COLORS = {
-    'primary': '#2D5016',
-    'secondary': '#4A8C5E',
-    'accent': '#6BBF59',
-    'text': '#2D3748',
-    'light': '#EDF2F7',
-    'border': '#CBD5E0',
-    'white': '#FFFFFF',
+    'primary': '#059669',           # Verde escuro elegante
+    'primary_light': "#1F9C29",     # Verde médio
+    'secondary': '#4F7942',         # Verde natural
+    'accent': '#88B04B',            # Verde suave
+    'gold': '#D4AF37',              # Dourado premium
+    'success': '#059669',           # Verde sucesso
+    'warning': '#F59E0B',           # Laranja aviso
+    'danger': '#DC2626',            # Vermelho erro
+    'text': '#0F172A',              # Preto azulado
+    'text_secondary': '#475569',    # Cinza médio
+    'text_light': '#94A3B8',        # Cinza claro
+    'light': '#F8FAFC',             # Branco suave
+    'light_blue': '#F0F9FF',        # Azul claro
+    'border': '#E2E8F0',            # Borda suave
+    'white': '#FFFFFF',             # Branco puro
+    'shadow': 'rgba(0, 0, 0, 0.08)', # Sombra sutil
 }
 
-# Dimensões dos cards
-CARD_WIDTH = 340
-CARD_HEIGHT = 510
-CARD_IMAGE_HEIGHT = 200
-
-# Dimensões da página
-PAGE_WIDTH = 2000
-HEADER_HEIGHT = 240
-FOOTER_HEIGHT = 80
-
-# Espaçamento
-ESPACO_X = 0
-ESPACO_Y = 60
-
-# Cards por página (para paginação)
-CARDS_POR_PAGINA = 6
-
-def get_html_styles() -> str:
-    """Retorna os estilos CSS para o HTML"""
-    return """
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: #f5f5f5;
-            padding: 0;
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-        .background {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 0;
-            object-fit: cover;
-        }
-        .container { 
-            position: relative;
-            z-index: 1;
-            max-width: 1400px; 
-            margin: 0 auto;
-            padding: 20px;
-            flex: 1;
-        }
-        .header {
-            background: rgba(255, 255, 255, 0.98);
-            padding: 30px;
-            border-radius: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            text-align: center;
-            margin-bottom: 30px;
-            backdrop-filter: blur(10px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 30px;
-            flex-wrap: wrap;
-        }
-        .header-logo-section {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-        .header-logo {
-            width: 120px;
-            height: 120px;
-            object-fit: contain;
-        }
-        .company-name {
-            color: #2D5016;
-            font-size: 1.3em;
-            font-weight: bold;
-        }
-        .header-content {
-            flex: 1;
-            min-width: 300px;
-        }
-        .header h1 { color: #2D5016; font-size: 2.5em; margin-bottom: 10px; }
-        .header p { color: #4A8C5E; font-size: 1.2em; margin: 5px 0; }
+def get_styles():
+    """Retorna todos os estilos customizados para o PDF"""
+    styles = getSampleStyleSheet()
+    
+    custom_styles = {
+        'company_name': ParagraphStyle(
+            'CompanyName',
+            parent=styles['Normal'],
+            fontSize=22,
+            leading=26,
+            textColor=HexColor(COLORS['primary']),
+            alignment=TA_LEFT,
+            fontName='Helvetica-Bold',
+            spaceAfter=3,
+            letterSpacing=0.5
+        ),
         
-        .footer {
-            background: rgba(255, 255, 255, 0.98);
-            padding: 25px;
-            border-radius: 20px;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
-            text-align: center;
-            margin-top: 40px;
-            backdrop-filter: blur(10px);
-            position: relative;
-            z-index: 1;
-        }
-        .footer h3 {
-            color: #2D5016;
-            font-size: 1.5em;
-            margin-bottom: 8px;
-        }
-        .footer p {
-            color: #4A8C5E;
-            font-size: 1em;
-        }
-        .controls {
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            border-radius: 15px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 15px rgba(0,0,0,0.08);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-            flex-wrap: wrap;
-            backdrop-filter: blur(10px);
-        }
-        .pagination {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: 600;
-        }
-        .btn-nav {
-            background: #2D5016;
-            color: white;
-        }
-        .btn-nav:hover:not(:disabled) {
-            background: #3a6b1d;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(45, 80, 22, 0.3);
-        }
-        .btn-nav:disabled {
-            background: #CBD5E0;
-            cursor: not-allowed;
-            opacity: 0.6;
-        }
-        .page-info {
-            font-size: 16px;
-            font-weight: 600;
-            color: #2D5016;
-            min-width: 120px;
-            text-align: center;
-        }
-        .cards-grid {
-            display: grid;
-            gap: 30px;
-            justify-content: center;
-        }
-        .pagina {
-            display: none;
-            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
-            gap: 30px;
-            justify-content: center;
-        }
-        .pagina.ativa {
-            display: grid;
-        }
-        .svg-container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .svg-container:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
-        }
-        @media (max-width: 768px) {
-            .header h1 { font-size: 1.8em; }
-            .header p { font-size: 1em; }
-            .header-logo { width: 80px; height: 80px; }
-            .company-name { font-size: 1.1em; }
-            .controls { flex-direction: column; }
-            .cards-grid { gap: 20px; }
-        }
-    """
+        'tagline': ParagraphStyle(
+            'Tagline',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=HexColor(COLORS['text_secondary']),
+            alignment=TA_LEFT,
+            fontName='Helvetica',
+            spaceAfter=0,
+            letterSpacing=0.3
+        ),
+        
+        'titulo_principal': ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=32,
+            leading=38,
+            textColor=HexColor(COLORS['primary']),
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold',
+            spaceBefore=0,
+            spaceAfter=4,
+            letterSpacing=1.2
+        ),
+        
+        'subtitulo': ParagraphStyle(
+            'CustomSubtitle',
+            parent=styles['Normal'],
+            fontSize=13,
+            leading=16,
+            textColor=HexColor(COLORS['text_secondary']),
+            spaceAfter=2,
+            alignment=TA_CENTER,
+            fontName='Helvetica',
+            letterSpacing=0.5
+        ),
+        
+        'contador_numero': ParagraphStyle(
+            'ContadorStyle',
+            parent=styles['Normal'],
+            fontSize=28,
+            leading=32,
+            textColor=HexColor(COLORS['primary']),
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold',
+            spaceAfter=3
+        ),
+        
+        'contador_label': ParagraphStyle(
+            'ContadorLabel',
+            parent=styles['Normal'],
+            fontSize=10,
+            textColor=HexColor(COLORS['text_secondary']),
+            alignment=TA_CENTER,
+            fontName='Helvetica',
+            spaceAfter=0,
+            letterSpacing=0.8
+        ),
+        
+        'data_grande': ParagraphStyle(
+            'DataGrande',
+            fontSize=16,
+            leading=20,
+            textColor=HexColor(COLORS['primary']),
+            alignment=TA_RIGHT,
+            fontName='Helvetica-Bold',
+            letterSpacing=0.5
+        ),
+        
+        'hora_pequena': ParagraphStyle(
+            'HoraPequena',
+            fontSize=11,
+            textColor=HexColor(COLORS['text_secondary']),
+            alignment=TA_RIGHT,
+            fontName='Helvetica',
+            letterSpacing=0.3
+        ),
+        
+        'periodo_text': ParagraphStyle(
+            'PeriodoText',
+            fontSize=10,
+            leading=14,
+            textColor=HexColor(COLORS['text_secondary']),
+            alignment=TA_CENTER,
+            fontName='Helvetica',
+            letterSpacing=0.2
+        ),
+        
+        'card_label': ParagraphStyle(
+            'Label',
+            fontSize=8,
+            textColor=HexColor(COLORS['primary']),
+            fontName='Helvetica-Bold',
+            spaceAfter=2
+        ),
+        
+        'card_valor': ParagraphStyle(
+            'Valor',
+            fontSize=10,
+            textColor=HexColor('#2D3748'),
+            fontName='Helvetica-Bold',
+            spaceAfter=4
+        ),
+        
+        'card_doc': ParagraphStyle(
+            'Doc',
+            fontSize=11,
+            textColor=white,
+            fontName='Helvetica-Bold',
+            alignment=TA_CENTER
+        ),
+        
+        'card_status': ParagraphStyle(
+            'Status',
+            fontSize=9,
+            alignment=TA_CENTER,
+            fontName='Helvetica-Bold'
+        ),
+        
+        'card_localizacao': ParagraphStyle(
+            'Loc',
+            fontSize=8,
+            textColor=HexColor('#2D3748'),
+            alignment=TA_CENTER
+        ),
+        
+        'icon_style': ParagraphStyle(
+            'Icon',
+            fontSize=22,
+            alignment=TA_CENTER,
+            spaceAfter=3
+        )
+    }
+    
+    return custom_styles
 
-def get_svg_defs() -> str:
-    """Retorna as definições SVG (filtros, gradientes, etc)"""
-    return """
-    <defs>
-        <filter id="sombra">
-            <feDropShadow dx="0" dy="6" stdDeviation="8" flood-opacity="0.25"/>
-        </filter>
-    </defs>
-    """
+def get_card_colors():
 
-def get_svg_script() -> str:
-    """Retorna o JavaScript para navegação no carrossel SVG"""
-    return """
-    <script type="text/javascript"><![CDATA[
-        const estado = {};
-        function navegar(id, dir) {
-            if (!estado[id]) {
-                const total = document.querySelectorAll('#slides_' + id + ' image').length || 1;
-                estado[id] = {atual: 0, total: total};
-            }
-            let e = estado[id];
-            e.atual = (e.atual + dir + e.total) % e.total;
-            const desl = -e.atual * 670;
-            document.getElementById('slides_' + id).setAttribute('transform', `translate(${desl + 15},15)`);
-            document.getElementById('contador_' + id).textContent = (e.atual + 1) + " / " + e.total;
-        }
-    ]]></script>
-    """
+    return {
+        'primaria': HexColor(COLORS['primary']),
+        'secundaria': HexColor(COLORS['secondary']),
+        'accent': HexColor(COLORS['accent']),
+        'gold': HexColor(COLORS['gold']),
+        'texto': HexColor('#2D3748'),
+        'borda': HexColor('#CBD5E0'),
+        'fundo_claro': HexColor('#f8f9fa'),
+        'erro': HexColor('#e74c3c'),
+        'contador_azul': HexColor('#EFF6FF'),
+        'contador_verde': HexColor('#ECFDF5'),
+        'contador_amarelo': HexColor('#E1E5E6'),
+        'borda_azul': HexColor("#E1E5E6"),
+        'borda_verde': HexColor("#E1E5E6"),
+        'borda_amarela': HexColor('#E1E5E6'),
+        'separador': HexColor(COLORS['border']),
+    }

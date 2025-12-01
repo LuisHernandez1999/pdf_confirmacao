@@ -1,63 +1,55 @@
 import logging
-from fastapi import HTTPException
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
-from domain.models.relatorio_confirmacao import RelatorioConfirmacao
 from domain.models.confirmacao_servico import ConfirmacaoServico
 from domain.models.imagem_confirmacao import ImagemConfirmacao
-import json
 
 logger = logging.getLogger("relatorio_service")
 
 
-def gerar_relatorio(
-    db: Session,
-    confirmacao_tag: str,
-    imagens_antes_ids: list[int],
-    imagens_depois_ids: list[int],
-) -> dict:
+def gerar_relatorios_completos(db: Session) -> dict:
+    """
+    Retorna TODAS as confirmações existentes no banco,
+    cada uma com TODAS as imagens vinculadas, sem filtros
+    e sem parâmetros de query.
+    """
 
-    # Buscar confirmação pelo tag
-    confirmacao = db.query(ConfirmacaoServico).filter(
-        ConfirmacaoServico.tag_doc == confirmacao_tag
-    ).first()
+    # 1 — Buscar todas as confirmações
+    confirmacoes = db.query(ConfirmacaoServico).all()
 
-    if not confirmacao:
-        raise HTTPException(404, "Confirmação não encontrada.")
+    if not confirmacoes:
+        return {"result": [], "msg": "Nenhuma confirmação cadastrada."}
 
-    # Buscar TODAS as imagens selecionadas
-    todas_ids = imagens_antes_ids + imagens_depois_ids
+    # 2 — Buscar todas as imagens existentes
+    imagens = db.query(ImagemConfirmacao).all()
 
-    imagens = db.query(ImagemConfirmacao).filter(
-        ImagemConfirmacao.confirmacao_id == confirmacao.id,
-        ImagemConfirmacao.id.in_(todas_ids)
-    ).all()
+    # Agrupar imagens por confirmacao_id
+    imagens_por_confirmacao = {}
+    for img in imagens:
+        imagens_por_confirmacao.setdefault(img.confirmacao_id, []).append(img)
 
-    if len(imagens) != len(todas_ids):
-        raise HTTPException(404, "Alguma imagem não pertence à confirmação.")
+    # 3 — Montar lista final
+    resultado = []
 
-    # Organizar imagens em dicionário
-    img_dict = {img.id: img for img in imagens}
-    imagens_antes = [img_dict[i] for i in imagens_antes_ids]
-    imagens_depois = [img_dict[i] for i in imagens_depois_ids]
+    for conf in confirmacoes:
+        imagens_conf = imagens_por_confirmacao.get(conf.id, [])
 
-    # Criar relatório (listas convertidas para JSON)
-    relatorio = RelatorioConfirmacao(
-        confirmacao_tag=confirmacao_tag,
-        imagem_antes=[img.imagem for img in imagens_antes],  # lista de URLs
-        imagem_depois=[img.imagem for img in imagens_depois],
-        latitude_antes=[float(img.latitude) for img in imagens_antes],
-        longitude_antes=[float(img.longitude) for img in imagens_antes],
-        latitude_depois=[float(img.latitude) for img in imagens_depois],
-        longitude_depois=[float(img.longitude) for img in imagens_depois],
-    )
+        resultado.append({
+            "confirmacao_tag": conf.tag_doc,
+            "nome_vistoriador": conf.nome_vistoriador,
+            "data_servico": str(conf.data_servico),
+            "tipo_servico": conf.tipo_servico,
 
-    # Salvar no banco
-    db.add(relatorio)
-    db.commit()
-    db.refresh(relatorio)
+            "imagens": [
+                {
+                    "imagem": img.imagem,
+                    "latitude": float(img.latitude) if img.latitude else None,
+                    "longitude": float(img.longitude) if img.longitude else None
+                }
+                for img in imagens_conf
+            ]
+        })
 
-    logger.info(f"Relatório criado para TAG {confirmacao_tag}")
+    logger.info("Relatórios completos gerados — sem filtro, sem parâmetros.")
 
-    # Retornar resultado serializado
-    return jsonable_encoder(relatorio)
+    return jsonable_encoder({"result": resultado})
