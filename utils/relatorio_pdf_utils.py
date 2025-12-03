@@ -4,7 +4,7 @@ from io import BytesIO
 from datetime import date
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.units import mm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Spacer, CondPageBreak
 
 from domain.models.confirmacao_servico import ConfirmacaoServico
 from domain.models.imagem_confirmacao import ImagemConfirmacao
@@ -105,12 +105,14 @@ def criar_pdf_visual(
             card_data.append(card_content)
         
         while len(card_data) < cards_por_linha:
-            card_data.append("")
+            vazio = Table([['']], colWidths=[78*mm])
+            vazio.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), 'white')]))
+            card_data.append(vazio)
 
         tabela = Table(
             [card_data],
-            colWidths=[85*mm, 85*mm, 85*mm],
-            rowHeights=[70*mm]
+            colWidths=[85*mm, 85*mm, 85*mm]
+            # REMOVIDO rowHeights → agora ReportLab calcula sozinho e não pula páginas vazias
         )
         tabela.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -123,8 +125,10 @@ def criar_pdf_visual(
         story.append(tabela)
         story.append(Spacer(1, 8*mm))
         
-        if (i + cards_por_linha) % 6 == 0 and i + cards_por_linha < total_cards:
-            story.append(PageBreak())
+        
+        story.append(CondPageBreak(80*mm))  
+        
+    story.append(CondPageBreak(50*mm))
     
     doc.build(
         story,

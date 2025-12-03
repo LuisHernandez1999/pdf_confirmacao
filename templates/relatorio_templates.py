@@ -1,7 +1,7 @@
 import base64
 from io import BytesIO
 from datetime import datetime, date
-from reportlab.platypus import Paragraph, Table, TableStyle, Spacer
+from reportlab.platypus import Paragraph, Table, TableStyle, Spacer, KeepInFrame, CondPageBreak
 from reportlab.lib.units import mm
 from reportlab.lib.colors import HexColor, white
 from reportlab.pdfgen import canvas as pdfcanvas
@@ -380,3 +380,76 @@ def _encode_image_base64(image_path: str) -> str | None:
         logger.error(f"Erro ao carregar imagem: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         return None
+
+def gerar_relatorio_pdf(
+    confirmacoes_validas: list[ConfirmacaoServico],
+    imagens_por_confirmacao: dict[str, ImagemConfirmacao | None],
+    data_inicial: date | None = None,
+    data_final: date | None = None,
+    output_path: str = "relatorio.pdf"
+):
+    from reportlab.platypus import SimpleDocTemplate, Table, Spacer, CondPageBreak
+
+    total_confirmacoes = len(confirmacoes_validas)
+    total_imagens = sum(1 for img in imagens_por_confirmacao.values() if img and img.imagem)
+
+    story = []
+    story.extend(criar_header_completo(total_confirmacoes, total_imagens, data_inicial, data_final))
+
+    # Prepara os dados
+    confirmacoes_com_imagens = [
+        (conf, imagens_por_confirmacao.get(conf.tag_doc))
+        for conf in confirmacoes_validas
+    ]
+
+    # ALTURA REAL de um card (some todas as rowHeights do criar_card_individual)
+    ALTURA_CARD = 10+6+4+6+4+6+4+6+8  # = 54mm + margens ≈ 60-65mm com padding
+    ALTURA_CARD_COM_ESPACO = 70*mm  # segurança + espaçamento entre linhas
+
+    for i in range(0, len(confirmacoes_com_imagens), 3):
+        batch = confirmacoes_com_imagens[i:i+3]
+        cards_linha = []
+
+        for conf, img in batch:
+            card = criar_card_individual(conf, img)
+            cards_linha.append(card)
+
+        # Preenche com cards vazios se necessário (só pra manter layout)
+        while len(cards_linha) < 3:
+            vazio = Table([['']], colWidths=78*mm)
+            vazio.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,-1), white)]))
+            cards_linha.append(vazio)
+
+        # AQUI ESTÁ A MÁGICA: TABELA SEM rowHeights FIXO!
+        linha_table = Table(
+            [cards_linha],
+            colWidths=[88*mm, 88*mm, 88*mm]
+            # ← SEM rowHeights! ReportLab calcula automaticamente
+        )
+        linha_table.setStyle(TableStyle([
+            ('VALIGN', (0,0), (-1,-1), 'TOP'),
+            ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+            ('LEFTPADDING', (0,0), (-1,-1), 4*mm),
+            ('RIGHTPADDING', (0,0), (-1,-1), 4*mm),
+        ]))
+
+        story.append(linha_table)
+        story.append(Spacer(1, 8*mm))
+
+        # FORÇA QUEBRA INTELIGENTE: só quebra se não couber mais UMA linha completa
+        story.append(CondPageBreak(ALTURA_CARD_COM_ESPACO))
+
+    # Remove possível página em branco no final
+    story.append(CondPageBreak(50*mm))
+
+    # Gera PDF
+    doc = SimpleDocTemplate(
+        output_path,
+        pagesize=landscape(A4),
+        leftMargin=12*mm, rightMargin=12*mm,
+        topMargin=15*mm, bottomMargin=25*mm
+    )
+    doc.build(story, onFirstPage=adicionar_background_e_footer, onLaterPages=adicionar_background_e_footer)
+
+    logger.info(f"PDF gerado com sucesso: {output_path} | {total_confirmacoes} cards")
+    return output_path
