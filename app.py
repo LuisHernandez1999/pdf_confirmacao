@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from api.relatorio_router import router as relatorio_router
+from routers.relatorio_router import router as relatorio_router
 
 app = FastAPI(title="Microservice Relatório de Confirmação")
 

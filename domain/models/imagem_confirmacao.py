@@ -1,4 +1,4 @@
-# domain/models/imagem_confirmacao.py ← substitua TODO o arquivo por isso (versão final, sem erro de nome)
+# domain/models/imagem_confirmacao.py
 
 from sqlalchemy import Table, MetaData
 from sqlalchemy.orm import relationship, foreign, remote  # ← adiciona foreign e remote aqui
@@ -24,9 +24,9 @@ mapper_registry.map_imperatively(
     imagem_confirmacao_table,
     properties={
         "confirmacao": relationship(
-            ConfirmacaoServico,  # classe direta (já importada)
+            ConfirmacaoServico,  
             primaryjoin=foreign(imagem_confirmacao_table.c.confirmacao_id) == remote(ConfirmacaoServico.id),
-            backref="imagens",   # cria ConfirmacaoServico.imagens automaticamente
+            backref="imagens",   
             lazy="joined"
         )
     }

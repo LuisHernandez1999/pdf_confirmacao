@@ -1,6 +1,4 @@
-"""
-Estilos e configurações visuais para os relatórios em PDF
-"""
+"""Estilos e configurações visuais para os relatórios em PDF"""
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.colors import HexColor, white, black
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
@@ -9,132 +7,132 @@ import os
 
 # Caminhos para recursos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FUNDO_PATH = Path(__file__).resolve().parents[1] / "imagens" / "planejamento_limpa.png"
-LOGO_PATH = Path(__file__).resolve().parents[1] / "imagens" / "limpalogo.png"
+FUNDO_PATH = Path(__file__).resolve().parents[1] / "assets" / "imagens" / "planejamento_limpa.png"
+LOGO_PATH = Path(__file__).resolve().parents[1] / "assets" / "imagens" / "limpalogo.png"
 
+# Paleta de cores profissional e minimalista
 COLORS = {
-    'primary': '#059669',           # Verde escuro elegante
-    'primary_light': "#1F9C29",     # Verde médio
-    'secondary': '#4F7942',         # Verde natural
-    'accent': '#88B04B',            # Verde suave
-    'gold': '#D4AF37',              # Dourado premium
+    'primary': '#1E293B',           # Slate escuro - profissional
+    'primary_light': '#334155',     # Slate médio
+    'secondary': '#64748B',         # Slate claro
+    'accent': '#059669',            # Verde corporativo
     'success': '#059669',           # Verde sucesso
     'warning': '#F59E0B',           # Laranja aviso
     'danger': '#DC2626',            # Vermelho erro
-    'text': '#0F172A',              # Preto azulado
-    'text_secondary': '#475569',    # Cinza médio
-    'text_light': '#94A3B8',        # Cinza claro
-    'light': '#F8FAFC',             # Branco suave
-    'light_blue': '#F0F9FF',        # Azul claro
+    'text': '#0F172A',              # Texto principal
+    'text_secondary': '#64748B',    # Texto secundário
+    'text_light': '#94A3B8',        # Texto claro
+    'light': '#F8FAFC',             # Fundo claro
     'border': '#E2E8F0',            # Borda suave
     'white': '#FFFFFF',             # Branco puro
-    'shadow': 'rgba(0, 0, 0, 0.08)', # Sombra sutil
+    'divider': '#CBD5E0',           # Divisor
 }
 
 def get_styles():
     """Retorna todos os estilos customizados para o PDF"""
     styles = getSampleStyleSheet()
-    
+
     custom_styles = {
         'company_name': ParagraphStyle(
             'CompanyName',
             parent=styles['Normal'],
-            fontSize=22,
-            leading=26,
+            fontSize=18,
+            leading=22,
             textColor=HexColor(COLORS['primary']),
             alignment=TA_LEFT,
             fontName='Helvetica-Bold',
-            spaceAfter=3,
-            letterSpacing=0.5
+            spaceAfter=2,
         ),
-        
+
         'tagline': ParagraphStyle(
             'Tagline',
             parent=styles['Normal'],
-            fontSize=10,
+            fontSize=9,
             textColor=HexColor(COLORS['text_secondary']),
             alignment=TA_LEFT,
             fontName='Helvetica',
             spaceAfter=0,
-            letterSpacing=0.3
         ),
-        
+
         'titulo_principal': ParagraphStyle(
             'CustomTitle',
             parent=styles['Heading1'],
-            fontSize=32,
-            leading=38,
+            fontSize=20,
+            leading=24,
             textColor=HexColor(COLORS['primary']),
-            alignment=TA_CENTER,
+            alignment=TA_LEFT,
             fontName='Helvetica-Bold',
             spaceBefore=0,
-            spaceAfter=4,
-            letterSpacing=1.2
+            spaceAfter=2,
         ),
-        
+
         'subtitulo': ParagraphStyle(
             'CustomSubtitle',
             parent=styles['Normal'],
-            fontSize=13,
-            leading=16,
+            fontSize=11,
+            leading=14,
             textColor=HexColor(COLORS['text_secondary']),
-            spaceAfter=2,
-            alignment=TA_CENTER,
+            spaceAfter=0,
+            alignment=TA_LEFT,
             fontName='Helvetica',
-            letterSpacing=0.5
         ),
-        
+
         'contador_numero': ParagraphStyle(
             'ContadorStyle',
             parent=styles['Normal'],
-            fontSize=28,
-            leading=32,
+            fontSize=32,
+            leading=36,
             textColor=HexColor(COLORS['primary']),
-            alignment=TA_CENTER,
+            alignment=TA_LEFT,
             fontName='Helvetica-Bold',
-            spaceAfter=3
+            spaceAfter=2
         ),
-        
+
         'contador_label': ParagraphStyle(
             'ContadorLabel',
             parent=styles['Normal'],
-            fontSize=10,
+            fontSize=9,
             textColor=HexColor(COLORS['text_secondary']),
-            alignment=TA_CENTER,
+            alignment=TA_LEFT,
             fontName='Helvetica',
             spaceAfter=0,
-            letterSpacing=0.8
         ),
-        
+
         'data_grande': ParagraphStyle(
             'DataGrande',
-            fontSize=16,
-            leading=20,
-            textColor=HexColor(COLORS['primary']),
-            alignment=TA_RIGHT,
-            fontName='Helvetica-Bold',
-            letterSpacing=0.5
-        ),
-        
-        'hora_pequena': ParagraphStyle(
-            'HoraPequena',
             fontSize=11,
+            leading=14,
             textColor=HexColor(COLORS['text_secondary']),
             alignment=TA_RIGHT,
             fontName='Helvetica',
-            letterSpacing=0.3
         ),
-        
+
+        'hora_pequena': ParagraphStyle(
+            'HoraPequena',
+            fontSize=9,
+            textColor=HexColor(COLORS['text_light']),
+            alignment=TA_RIGHT,
+            fontName='Helvetica',
+        ),
+
         'periodo_text': ParagraphStyle(
             'PeriodoText',
             fontSize=10,
             leading=14,
             textColor=HexColor(COLORS['text_secondary']),
-            alignment=TA_CENTER,
+            alignment=TA_LEFT,
             fontName='Helvetica',
-            letterSpacing=0.2
         ),
-        
+
+        'periodo_label': ParagraphStyle(
+            'PeriodoLabel',
+            fontSize=8,
+            textColor=HexColor(COLORS['text_light']),
+            alignment=TA_LEFT,
+            fontName='Helvetica',
+            spaceAfter=1,
+        ),
+
         'card_label': ParagraphStyle(
             'Label',
             fontSize=8,
@@ -142,7 +140,7 @@ def get_styles():
             fontName='Helvetica-Bold',
             spaceAfter=2
         ),
-        
+
         'card_valor': ParagraphStyle(
             'Valor',
             fontSize=10,
@@ -150,7 +148,7 @@ def get_styles():
             fontName='Helvetica-Bold',
             spaceAfter=4
         ),
-        
+
         'card_doc': ParagraphStyle(
             'Doc',
             fontSize=11,
@@ -158,21 +156,21 @@ def get_styles():
             fontName='Helvetica-Bold',
             alignment=TA_CENTER
         ),
-        
+
         'card_status': ParagraphStyle(
             'Status',
             fontSize=9,
             alignment=TA_CENTER,
             fontName='Helvetica-Bold'
         ),
-        
+
         'card_localizacao': ParagraphStyle(
             'Loc',
             fontSize=8,
             textColor=HexColor('#2D3748'),
             alignment=TA_CENTER
         ),
-        
+
         'icon_style': ParagraphStyle(
             'Icon',
             fontSize=22,
@@ -180,25 +178,19 @@ def get_styles():
             spaceAfter=3
         )
     }
-    
+
     return custom_styles
 
 def get_card_colors():
-
     return {
         'primaria': HexColor(COLORS['primary']),
         'secundaria': HexColor(COLORS['secondary']),
         'accent': HexColor(COLORS['accent']),
-        'gold': HexColor(COLORS['gold']),
         'texto': HexColor('#2D3748'),
-        'borda': HexColor('#CBD5E0'),
-        'fundo_claro': HexColor('#f8f9fa'),
-        'erro': HexColor('#e74c3c'),
-        'contador_azul': HexColor('#EFF6FF'),
-        'contador_verde': HexColor('#ECFDF5'),
-        'contador_amarelo': HexColor('#E1E5E6'),
-        'borda_azul': HexColor("#E1E5E6"),
-        'borda_verde': HexColor("#E1E5E6"),
-        'borda_amarela': HexColor('#E1E5E6'),
-        'separador': HexColor(COLORS['border']),
+        'borda': HexColor(COLORS['border']),
+        'fundo_claro': HexColor(COLORS['light']),
+        'erro': HexColor(COLORS['danger']),
+        'contador_bg': HexColor(COLORS['white']),
+        'contador_borda': HexColor(COLORS['border']),
+        'separador': HexColor(COLORS['divider']),
     }
