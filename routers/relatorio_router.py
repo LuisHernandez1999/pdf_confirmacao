@@ -1,14 +1,14 @@
 # routers/relatorio_router.py
-from fastapi import APIRouter, HTTPException, Depends, Query, Response
+from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
 import logging
+from service.service_table_conf import listar_confi_tabela
 
 from core.database import get_db
 from service.service_list_relatorio import (  
-    gerar_relatorios_completos,
     gerar_pdf_relatorio_completo,
 )
 
@@ -18,6 +18,24 @@ router = APIRouter(
 )
 
 logger = logging.getLogger("api.relatorio")
+@router.get("/historico")
+def get_historico(
+    db: Session = Depends(get_db),
+    tag_conf: str | None = Query(None),
+    data_inicial: date | None = Query(None),
+    data_final: date | None = Query(None),
+    tipo_servico: str | None = Query(None),
+    com_imagens: bool | None = Query(None),
+):
+    dados = listar_confi_tabela(
+        db=db,
+        tag_conf=tag_conf,
+        data_inicial=data_inicial,
+        data_final=data_final,
+        tipo_servico=tipo_servico,
+        com_imagens=com_imagens,
+    )
+    return {"data": dados}
 
 
 @router.get("/completo/download-pdf")

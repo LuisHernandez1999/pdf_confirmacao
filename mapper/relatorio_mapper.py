@@ -3,7 +3,6 @@ from datetime import date, datetime
 from typing import Sequence,List
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from copy import copy
 from domain.models.relatorio_confirmacao import RelatorioConfirmacao
 from domain.models.confirmacao_servico import ConfirmacaoServico
 
