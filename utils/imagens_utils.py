@@ -11,9 +11,6 @@ def get_image_path(filename: str) -> str:
     return os.path.join(BASE_IMAGE_PATH, filename)
 
 def get_images_paths(images: Optional[List[str]]) -> List[str]:
-    """
-    recebe lista de nomes de arquivos e devolve caminhos completos.
-    """
     if not images:
         return []
     return [get_image_path(img) for img in images]

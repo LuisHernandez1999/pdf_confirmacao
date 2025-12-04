@@ -1,10 +1,9 @@
 import base64
 from io import BytesIO
 from datetime import datetime, date
-from reportlab.platypus import Paragraph, Table, TableStyle, Spacer, KeepInFrame, CondPageBreak
+from reportlab.platypus import Paragraph, Table, TableStyle, Spacer
 from reportlab.lib.units import mm
 from reportlab.lib.colors import HexColor, white
-from reportlab.pdfgen import canvas as pdfcanvas
 from reportlab.lib.pagesizes import landscape, A4
 import logging
 from PIL import Image as PILImage
