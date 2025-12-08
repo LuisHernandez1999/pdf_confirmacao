@@ -1,9 +1,8 @@
 import logging
 from datetime import date
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from sqlalchemy.orm import Session, joinedload
 from domain.models.confirmacao_servico import ConfirmacaoServico
-
 
 logger = logging.getLogger(__name__)
 
@@ -12,19 +11,25 @@ def listar_confirmacoes_para_tabela(
     db: Session,
     tag_conf: Optional[str] = None,
     data_inicial: Optional[date] = None,
-    data_servico:Optional[date]=None,
+    data_servico: Optional[date] = None,
     data_final: Optional[date] = None,
     tipo_servico: Optional[str] = None,
     com_imagens: Optional[bool] = None,
-) -> List[dict]:
+    cursor: Optional[int] = None,          
+    limit: int = 50                        
+) -> Tuple[List[dict], Optional[int]]:
     try:
         logger.info("Listando confirmações")
 
         query = db.query(ConfirmacaoServico).options(
             joinedload(ConfirmacaoServico.imagens)
         )
+
+        # -------------------------------
+        # Filtros existentes
+        # -------------------------------
         if data_servico:
-            query=query.filter(ConfirmacaoServico.data_servico==data_servico)
+            query = query.filter(ConfirmacaoServico.data_servico == data_servico)
 
         if tag_conf:
             query = query.filter(ConfirmacaoServico.tag_doc.ilike(f"%{tag_conf}%"))
@@ -43,15 +48,33 @@ def listar_confirmacoes_para_tabela(
                 query = query.filter(ConfirmacaoServico.imagens.any())
             else:
                 query = query.filter(~ConfirmacaoServico.imagens.any())
-        query = query.order_by(
-            ConfirmacaoServico.data_servico.desc(),
-            ConfirmacaoServico.id.desc()
-        )
 
-        confirmacoes = query.all()
+        # -------------------------------
+        # Cursor (id < cursor para paginação)
+        # -------------------------------
+        if cursor:
+            query = query.filter(ConfirmacaoServico.id < cursor)
+
+        query = query.order_by(
+            ConfirmacaoServico.id.desc()
+        ).limit(limit + 1)          # 👈 pega 1 extra para saber se existe próxima página
+
+        registros = query.all()
 
         resultado = []
-        for c in confirmacoes:
+        next_cursor = None
+
+        # ------------------------------------------
+        # Verifica se existe próxima página
+        # ------------------------------------------
+        if len(registros) > limit:
+            next_cursor = registros[-2].id  # id do penúltimo item
+            registros = registros[:limit]   # remove extra
+
+        # ------------------------------------------
+        # Monta resultado
+        # ------------------------------------------
+        for c in registros:
             lat = lng = None
             if c.imagens:
                 img = c.imagens[0]
@@ -70,7 +93,9 @@ def listar_confirmacoes_para_tabela(
             })
 
         logger.info(f"Retornadas {len(resultado)} confirmações")
-        return resultado
+
+        # Retorna lista + cursor da próxima página
+        return resultado, next_cursor
 
     except Exception as e:
         logger.error(f"Erro no mapper: {e}", exc_info=True)

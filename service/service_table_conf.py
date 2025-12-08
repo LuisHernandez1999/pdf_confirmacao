@@ -13,6 +13,8 @@ def listar_confi_tabela(
     data_final: Optional[date] = None,
     tipo_servico: Optional[str] = None,
     com_imagens: Optional[bool] = None,
+    cursor: Optional[int] = None,          
+    limit: int = 10 
 ) -> List[dict]:
     try:
         return listar_confirmacoes_para_tabela(
@@ -23,6 +25,8 @@ def listar_confi_tabela(
             data_final=data_final,
             tipo_servico=tipo_servico,
             com_imagens=com_imagens,
+            cursor=cursor,
+            limit=limit
         )
     except Exception:
         raise HTTPException(status_code=500, detail="erro ao carregar confirmacoes")

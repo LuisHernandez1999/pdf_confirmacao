@@ -26,17 +26,25 @@ def get_historico(
     data_final: date | None = Query(None),
     tipo_servico: str | None = Query(None),
     com_imagens: bool | None = Query(None),
+    cursor: Optional[int] = Query(None),
+    limit: int = Query(10)
 ):
-    dados = listar_confi_tabela(
+    dados, next_cursor = listar_confi_tabela(
         db=db,
         tag_conf=tag_conf,
         data_inicial=data_inicial,
         data_final=data_final,
         tipo_servico=tipo_servico,
         com_imagens=com_imagens,
+        cursor=cursor,
+        limit=limit,
     )
-    return {"data": dados}
 
+    return {
+        "data": dados,
+        "next_cursor": next_cursor,
+        "limit": limit
+    }
 
 @router.get("/completo/download-pdf")
 async def relatorio_completo_pdf(
@@ -49,15 +57,11 @@ async def relatorio_completo_pdf(
         example="15,28,94"
     ),
 ):
-    """
-    Gera e baixa o relatório completo em PDF.
-    Agora você pode excluir imagens específicas passando os IDs delas!
-    """
+  
     imagens_excluir_ids: List[int] | None = None
 
     if excluir_imagens:
         try:
-            # Remove espaços e converte para int
             imagens_excluir_ids = [int(x.strip()) for x in excluir_imagens.split(",") if x.strip()]
             if not imagens_excluir_ids:
                 raise ValueError()
@@ -73,7 +77,7 @@ async def relatorio_completo_pdf(
             db=db,
             data_inicial=data_inicial,
             data_final=data_final,
-            imagens_excluir=imagens_excluir_ids,   # passa a lista pro service
+            imagens_excluir=imagens_excluir_ids,   
         )
 
         filename = "relatorio_completo.pdf"
