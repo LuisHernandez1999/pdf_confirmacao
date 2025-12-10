@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers.relatorio_router import router as relatorio_router
+from src.routers.relatorio_router import router as relatorio_router
 
 app = FastAPI(title="Microservice Relatório de Confirmação")
 
