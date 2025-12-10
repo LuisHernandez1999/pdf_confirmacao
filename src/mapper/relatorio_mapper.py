@@ -5,6 +5,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from src.domain.models.relatorio_confirmacao import RelatorioConfirmacao
 from src.domain.models.confirmacao_servico import ConfirmacaoServico
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger("relatorio_mapper")
 
@@ -107,10 +108,6 @@ def filtrar_imagens_excluidas(
     confirmacoes: Sequence[ConfirmacaoServico],
     ids_excluir: List[int],
 ) -> List[ConfirmacaoServico]:
-    """
-    Remove imagens específicas das confirmações.
-    Versão FINAL e à prova de SQLAlchemy (funciona com attached/detached/qualquer estado).
-    """
     if not ids_excluir:
         return list(confirmacoes)
 
@@ -132,13 +129,11 @@ def filtrar_imagens_excluidas(
         for campo in campos_para_copiar:
             if hasattr(conf, campo):
                 setattr(nova_conf, campo, getattr(conf, campo))
-
-        # === TRATA AS IMAGENS ===
         if conf.imagens:
             imagens_mantidas = []
             for img in conf.imagens:
                 if img.id not in ids_set:
-                    imagens_mantidas.append(img)  # mantém o objeto imagem original (é seguro)
+                    imagens_mantidas.append(img)  
                 else:
                     total_removidas += 1
                     logger.info("Imagem ID %d excluída do relatório (tag_doc: %s)", img.id, conf.tag_doc or "sem_tag")
@@ -151,3 +146,23 @@ def filtrar_imagens_excluidas(
 
     logger.info("Total de imagens excluídas do PDF: %d", total_removidas)
     return resultado
+
+
+def get_imagens_modal(db: Session) -> list[dict]:
+    c = (
+        db.query(ConfirmacaoServico)
+        .options(joinedload(ConfirmacaoServico.imagens))
+        .order_by(ConfirmacaoServico.data_servico.desc())
+        .all()
+    )
+
+    imagens_lista = []  
+
+    for conf in c:  
+        for img in conf.imagens or []:  
+            imagens_lista.append({
+                "imagem_id": img.id,
+            })
+
+    return imagens_lista
+   
