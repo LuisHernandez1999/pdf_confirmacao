@@ -27,28 +27,53 @@ def _is_confirmacao_valida(c: ConfirmacaoServico) -> bool:
     return True
 
 
-def mapear_confirmacoes_validas(confirmacoes: Sequence[ConfirmacaoServico]) -> list[ConfirmacaoServico]:
+def mapear_confirmacoes_validas(confirmacoes: Sequence[ConfirmacaoServico]) -> list[dict]:
     confirmacoes_validas = [c for c in confirmacoes if _is_confirmacao_valida(c)]
 
     if not confirmacoes_validas:
         raise HTTPException(
             status_code=400,
-            detail="Nenhuma confirmação com dados completos foi encontrada. "
-                   "Verifique tag_doc, nome_vistoriador, tipo_servico e data_servico."
+            detail=(
+                "Nenhuma confirmação com dados completos foi encontrada. "
+                "Verifique tag_doc, nome_vistoriador, tipo_servico e data_servico."
+            )
         )
 
     logger.info(
         "Filtragem de confirmações: %d válidas de %d totais",
         len(confirmacoes_validas), len(confirmacoes)
     )
-    return confirmacoes_validas
+
+    BASE_URL = "/static/imagens/"
+
+    lista_mapeada = []
+
+    for c in confirmacoes_validas:
+        lista_mapeada.append({
+            "id": c.id,
+            "tag_doc": c.tag_doc,
+            "tipo_servico": c.tipo_servico,
+            "data_servico": (
+                c.data_servico.isoformat() if c.data_servico else None
+            ),
+            "imagens": [
+                {
+                    "id": img.id,
+                    "url": f"{BASE_URL}{img.imagem}"
+                }
+                for img in (c.imagens or [])
+            ]
+        })
+
+    # AQUI É O QUE ESTAVA ERRADO
+    return lista_mapeada
 
 
-def calcular_total_imagens(confirmacoes: Sequence[ConfirmacaoServico]) -> int:
-    total = sum(len(c.imagens or ()) for c in confirmacoes)
+
+def calcular_total_imagens(confirmacoes: Sequence[dict]) -> int:
+    total = sum(len(c.get("imagens", [])) for c in confirmacoes)
     logger.debug("Total de imagens calculado: %d", total)
     return total
-
 
 def gerar_observacao_relatorio(
     total_confirmacoes: int,

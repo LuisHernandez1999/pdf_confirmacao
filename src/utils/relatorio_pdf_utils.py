@@ -25,25 +25,34 @@ def setup_logger():
         logger.addHandler(handler)
         logger.setLevel(logging.DEBUG)
 
-def expandir_confirmacoes_em_cards_imagem(confirmacoes: list[ConfirmacaoServico]) -> list[tuple[ConfirmacaoServico, ImagemConfirmacao]]:
-    setup_logger()
+def expandir_confirmacoes_em_cards_imagem(confirmacoes: list[dict]) -> list[tuple[dict, dict | None]]:
+
+
     cards_data = []
+
     for conf in confirmacoes:
-        if conf.imagens and len(conf.imagens) > 0:
-            for img in conf.imagens:
+        imagens = conf.get("imagens", [])
+
+        # Se tem imagens → 1 card por imagem
+        if imagens:
+            for img in imagens:
                 cards_data.append((conf, img))
+
         else:
+            # Sem imagens → 1 card sem imagem
             cards_data.append((conf, None))
-    logger.info(f"Expandiu {len(confirmacoes)} confirmações em {len(cards_data)} cards (imagens exibidas no PDF)")
+
     return cards_data
 
-def aplicar_filtros_query(query, data_inicial: date | None = None, data_final: date | None = None):
+def aplicar_filtros_query(query, data_inicial: date | None = None, data_final: date | None = None, tipo_servico: str | None=None):
     if data_inicial:
         logger.info(f"Aplicando filtro de data inicial: {data_inicial}")
         query = query.filter(ConfirmacaoServico.data_servico >= data_inicial)
     if data_final:
         logger.info(f"Aplicando filtro de data final: {data_final}")
         query = query.filter(ConfirmacaoServico.data_servico <= data_final)
+    if tipo_servico:
+        query=query.filter(ConfirmacaoServico.tipo_servico<=tipo_servico)
     return query
 
 

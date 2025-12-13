@@ -1,23 +1,56 @@
-# routers/relatorio_router.py
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
 import logging
-from src.service.service_table_conf import listar_confi_tabela
 
 from src.core.database import get_db
-from src.service.service_list_relatorio import (  
-    gerar_pdf_relatorio_completo,
+from src.service.service_list_relatorio import (
+    gerar_relatorios_completos,
+    gerar_pdf_relatorio_completo
 )
-
-router = APIRouter( 
+from src.service.service_table_conf import listar_confi_tabela
+router = APIRouter(
     prefix="/relatorio",
     tags=["Relatório"]
 )
 
 logger = logging.getLogger("api.relatorio")
+
+
+# ==============================================================
+# 1) ENDPOINT QUE O FRONTEND USA PARA LISTAR CONFIRMAÇÕES
+# ==============================================================
+
+@router.get("/completo")
+def listar_relatorio_completo(
+    db: Session = Depends(get_db),
+    data_inicial: Optional[date] = Query(None),
+    data_final: Optional[date] = Query(None),
+    tipo_servico: Optional[str] = Query(None)
+):
+    try:
+        dados = gerar_relatorios_completos(
+            db=db,
+            data_inicial=data_inicial,
+            data_final=data_final,
+            tipo_servico=tipo_servico
+        )
+
+        return dados
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Erro inesperado no endpoint /relatorio/completo")
+        raise HTTPException(status_code=500, detail="Erro interno")
+
+
+# ==============================================================
+# 2) HISTÓRICO (TABELA COM CURSOR)
+# ==============================================================
+
 @router.get("/historico")
 def get_historico(
     db: Session = Depends(get_db),
@@ -46,64 +79,38 @@ def get_historico(
         "limit": limit
     }
 
-@router.get("/completo/download-pdf")
+
+# ==============================================================
+# 3) PDF (ACEITA FILTROS + EXCLUSÃO DE IMAGENS)
+# ==============================================================
+
+@router.post("/pdf")
 async def relatorio_completo_pdf(
     db: Session = Depends(get_db),
-    data_inicial: Optional[date] = Query(None, description="Data inicial do filtro (YYYY-MM-DD)"),
-    data_final: Optional[date] = Query(None, description="Data final do filtro (YYYY-MM-DD)"),
-    excluir_imagens: Optional[str] = Query(
-        None,
-        description="IDs das imagens que você quer REMOVER do PDF, separados por vírgula. Ex: 42,57,103",
-        example="15,28,94"
-    ),
+    body: dict = None
 ):
-  
-    imagens_excluir_ids: List[int] | None = None
-
-    if excluir_imagens:
-        try:
-            imagens_excluir_ids = [int(x.strip()) for x in excluir_imagens.split(",") if x.strip()]
-            if not imagens_excluir_ids:
-                raise ValueError()
-            logger.info(f"Usuário solicitou exclusão de {len(imagens_excluir_ids)} imagem(ns): {imagens_excluir_ids}")
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail="Parâmetro 'excluir_imagens' inválido. Use IDs separados por vírgula (ex: 10,25,37)"
-            )
-
     try:
+        data_inicial = body.get("data_inicial")
+        data_final = body.get("data_final")
+        tipo_servico = body.get("tipo_servico")
+        imagens_excluir = body.get("imagens_excluir", [])
+
         pdf_bytes = gerar_pdf_relatorio_completo(
             db=db,
             data_inicial=data_inicial,
             data_final=data_final,
-            imagens_excluir=imagens_excluir_ids,   
+            tipo_servico= tipo_servico,
+            imagens_excluir=imagens_excluir
         )
-
-        filename = "relatorio_completo.pdf"
-        if data_inicial or data_final:
-            periodo = []
-            if data_inicial:
-                periodo.append(data_inicial.strftime("%Y%m%d"))
-            if data_final:
-                periodo.append(data_final.strftime("%Y%m%d"))
-            filename = f"relatorio_completo_{'-'.join(periodo)}.pdf"
-
-        logger.info(f"PDF gerado com sucesso - {len(pdf_bytes)} bytes - Nome: {filename}")
 
         return StreamingResponse(
             iter([pdf_bytes]),
             media_type="application/pdf",
             headers={
-                "Content-Disposition": f'attachment; filename="{filename}"',
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Pragma": "no-cache",
-                "Expires": "0",
+                "Content-Disposition": "attachment; filename=relatorio.pdf"
             }
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.exception("Erro inesperado ao gerar PDF do relatório completo")
-        raise HTTPException(status_code=500, detail="Erro interno ao gerar o PDF")
+        logger.exception("Erro ao gerar PDF")
+        raise HTTPException(status_code=500, detail="Erro ao gerar PDF")

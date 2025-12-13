@@ -229,28 +229,28 @@ def criar_contadores(total_confirmacoes: int, total_cards: int, data_inicial: da
 
     return contadores_row
 
-def criar_card_individual(conf: ConfirmacaoServico, img: ImagemConfirmacao | None) -> Table:
+def criar_card_individual(conf: dict, img: dict | None) -> Table:
     """
     Cria um card individual formatado para o PDF
-    
-    Args:
-        conf: Confirmação de serviço
-        img: Imagem da confirmação (opcional)
-    
-    Returns:
-        Table formatada como card
+    Adaptado para trabalhar com dicionários, sem objetos ORM
     """
+
     styles = get_styles()
     colors = get_card_colors()
 
-    # Preparar dados
-    tag_doc = conf.tag_doc or "NULO"
-    vistoriador = conf.nome_vistoriador or "NULO"
-    servico = conf.tipo_servico or "NULO"
-    data = conf.data_servico.strftime("%d/%m/%Y") if conf.data_servico else "NULO"
+    # Preparar dados vindo de dict
+    tag_doc = conf.get("tag_doc", "NULO")
+    vistoriador = conf.get("nome_vistoriador", "NULO")
+    servico = conf.get("tipo_servico", "NULO")
+
+    data_serv = conf.get("data_servico")
+    if isinstance(data_serv, (date, datetime)):
+        data = data_serv.strftime("%d/%m/%Y")
+    else:
+        data = "NULO"
 
     # Status de imagem
-    if img and img.imagem:
+    if img and img.get("imagem"):
         status_img = "📷 Imagem disponível"
         cor_status = colors['accent']
     else:
@@ -258,8 +258,14 @@ def criar_card_individual(conf: ConfirmacaoServico, img: ImagemConfirmacao | Non
         cor_status = colors['erro']
 
     # Localização
-    if img and img.latitude and img.longitude:
-        localizacao = f"📍 {img.latitude:.6f}, {img.longitude:.6f}"
+    latitude = None
+    longitude = None
+    if img:
+        latitude = img.get("latitude")
+        longitude = img.get("longitude")
+
+    if latitude and longitude:
+        localizacao = f"📍 {latitude:.6f}, {longitude:.6f}"
     else:
         localizacao = "📍 Localização: NULO"
 
