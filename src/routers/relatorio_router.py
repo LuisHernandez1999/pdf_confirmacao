@@ -1,16 +1,15 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List, Optional
+from typing import  Optional
 from datetime import date
 import logging
-
 from src.core.database import get_db
 from src.service.service_list_relatorio import (
     gerar_relatorios_completos,
     gerar_pdf_relatorio_completo
 )
-from src.service.service_table_conf import listar_confi_tabela
+from src.service.service_table_conf import listar_confi_tabela,galeria_imgs_service
 router = APIRouter(
     prefix="/relatorio",
     tags=["Relatório"]
@@ -114,3 +113,32 @@ async def relatorio_completo_pdf(
     except Exception as e:
         logger.exception("Erro ao gerar PDF")
         raise HTTPException(status_code=500, detail="Erro ao gerar PDF")
+
+
+@router.get("/galeria")
+async def galeria_imagens_conf(
+    db:Session = Depends(get_db),
+    data_inicial: Optional[date] = Query(None),
+    data_final: Optional[date] = Query(None),
+    tipo_servico: Optional[str] = Query(None),
+    cursor: int | None = Query(None),
+    limit: int= 50
+):
+    cursor: int = Query(..., ge=0, description="ultimo imagem_id recebido"),
+    limit = limit
+    if limit > cursor and cursor != 0:
+        raise HTTPException(
+            status_code=400,
+            detail="limit nao pode ser maior que o cursor"
+        )
+    return galeria_imgs_service(
+        db=db,
+        cursor=cursor,
+        limit=limit,
+        tipo_servico=tipo_servico,
+        data_inicial=data_inicial,
+        data_final=data_final,
+    )
+    
+
+

@@ -131,7 +131,7 @@ def gerar_relatorios_completos(
                 "data_servico": item.data_servico,
                 "imagens": imagens
             })
-
+        
         logger.info("✅ Relatório completo montado com sucesso")
 
         return {
@@ -208,7 +208,7 @@ def gerar_pdf_relatorio_completo(
             if not_found:
                 logger.warning(f"⚠️ IDs de imagens solicitados para exclusão mas não encontrados no conjunto atual: {sorted(list(not_found))}")
 
-            logger.info(f"🗑️ Aplicando exclusão de imagens: {imagens_excluir_set}")
+            logger.info(f"Aplicando exclusão de imagens: {imagens_excluir_set}")
 
             for c in confirmacoes_validas:
                 imagens_antes = len(c.get("imagens", []))
@@ -223,6 +223,7 @@ def gerar_pdf_relatorio_completo(
 
                 if excluidas > 0:
                     logger.debug(f"❌ Confirmação ID {c['id']} — {excluidas} imagens removidas")
+                    
 
         logger.info(f"🧹 Total de imagens removidas: {total_excluidas}")
 
