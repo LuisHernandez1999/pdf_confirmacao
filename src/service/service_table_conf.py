@@ -38,7 +38,7 @@ def listar_confi_tabela(
 def galeria_imgs_service(
     db:Session,
     cursor:int,
-    limit:int[50],
+    limit:int =50 ,
     tipo_servico: str | None = None,
     data_inicial: date | None = None,
     data_final: date | None = None,
@@ -52,8 +52,7 @@ def galeria_imgs_service(
             data_servico =data_servico,
             tipo_servico= tipo_servico,
             data_final=data_final,
-            data_inicial=data_inicial,
-            data_servico=data_servico,
+            data_inicial=data_inicial
         )
     except Exception:
         raise HTTPException(status_code=500, detail="erro ao carregar imagens")

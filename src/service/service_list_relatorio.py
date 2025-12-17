@@ -24,30 +24,6 @@ logger = logging.getLogger("relatorio_service")
 setup_logger()
 
 
-# ============================================================
-# RETORNO JSON → traz imagens recentes + IDs para o frontend
-# ============================================================
-
-
-from src.domain.models.confirmacao_servico import ConfirmacaoServico
-from src.utils.relatorio_pdf_utils import (
-    setup_logger,
-    expandir_confirmacoes_em_cards_imagem,
-    aplicar_filtros_query,
-    criar_pdf_visual
-)
-from src.mapper.relatorio_mapper import (
-    mapear_confirmacoes_validas,
-    calcular_total_imagens,
-    gerar_observacao_relatorio,
-    mapear_dados_relatorio,
-    criar_relatorio_confirmacao,
-    filtrar_imagens_excluidas
-)
-
-logger = logging.getLogger("relatorio_service")
-setup_logger()
-
 
 # ============================================================
 # RETORNO JSON → traz imagens recentes + IDs para o frontend
