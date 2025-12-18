@@ -117,21 +117,22 @@ async def relatorio_completo_pdf(
 
 @router.get("/galeria")
 async def galeria_imagens_conf(
-    db:Session = Depends(get_db),
+    db: Session = Depends(get_db),
     data_inicial: Optional[date] = Query(None),
     data_final: Optional[date] = Query(None),
     tipo_servico: Optional[str] = Query(None),
-    cursor: int | None = Query(None),
-    limit: int= 50
+    cursor: Optional[int] = Query(
+        None,
+        description="Último imagem_id recebido (cursor pagination)"
+    ),
+    limit: int = Query(
+        50,
+        ge=1,
+        le=100,
+        description="Quantidade de imagens por página"
+    ),
 ):
-    cursor: int = Query(..., ge=0, description="ultimo imagem_id recebido"),
-    limit = limit
-    if limit > cursor and cursor != 0:
-        raise HTTPException(
-            status_code=400,
-            detail="limit nao pode ser maior que o cursor"
-        )
-    return galeria_imgs_service(
+    return gerar_relatorios_completos(
         db=db,
         cursor=cursor,
         limit=limit,
@@ -139,6 +140,3 @@ async def galeria_imagens_conf(
         data_inicial=data_inicial,
         data_final=data_final,
     )
-    
-
-
