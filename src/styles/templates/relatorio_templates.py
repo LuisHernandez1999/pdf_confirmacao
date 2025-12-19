@@ -10,7 +10,7 @@ from PIL import Image as PILImage
 
 from src.domain.models.confirmacao_servico import ConfirmacaoServico
 from src.domain.models.imagem_confirmacao import ImagemConfirmacao
-from src.styles.templates.relatorio_styles import (
+from src.styles.relatorio_styles import (
     get_styles, 
     get_card_colors, 
     LOGO_PATH, 

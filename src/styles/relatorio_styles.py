@@ -8,7 +8,7 @@ import os
 # Caminhos para recursos
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FUNDO_PATH = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[2]
     / "src"
     / "assets"
     / "imagens"
@@ -16,7 +16,7 @@ FUNDO_PATH = (
 )
 
 LOGO_PATH = (
-    Path(__file__).resolve().parents[3]
+    Path(__file__).resolve().parents[2]
     / "src"
     / "assets"
     / "imagens"

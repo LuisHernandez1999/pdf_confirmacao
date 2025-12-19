@@ -5,11 +5,11 @@ from typing import  Optional
 from datetime import date
 import logging
 from src.core.database import get_db
-from src.service.service_list_relatorio import (
+from src.service.relatorio_service.service_list_relatorio import (
     gerar_relatorios_completos,
     gerar_pdf_relatorio_completo
 )
-from src.service.service_table_conf import listar_confi_tabela,galeria_imgs_service
+from src.service.table_service.service_table_conf import listar_confi_tabela,galeria_imgs_service
 router = APIRouter(
     prefix="/relatorio",
     tags=["Relatório"]

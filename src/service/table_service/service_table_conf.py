@@ -3,8 +3,8 @@ from typing import List, Optional
 from datetime import date
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
-from src.mapper.list_table_cf_mapper import listar_confirmacoes_para_tabela
-from src.mapper.galeria_mapper import imagens_galeria_mapper
+from src.mapper.table_mappers.list_table_cf_mapper import listar_confirmacoes_para_tabela
+from src.mapper.relatorio_mappers.galeria_mapper import imagens_galeria_mapper
 
 def listar_confi_tabela(
     db: Session,

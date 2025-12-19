@@ -2,7 +2,9 @@ from datetime import date
 from sqlalchemy.orm import Session
 from src.domain.models.imagem_confirmacao import ConfirmacaoServico, ImagemConfirmacao
 import logging
+
 logger = logging.getLogger(__name__)
+
 def imagens_galeria_mapper(
     db: Session,
     cursor: int | None = None,
@@ -15,7 +17,7 @@ def imagens_galeria_mapper(
         db.query(
             ImagemConfirmacao.id.label("imagem_id"),
             ImagemConfirmacao.confirmacao_id,
-            ImagemConfirmacao.imagem,           
+            ImagemConfirmacao.imagem,
             ImagemConfirmacao.latitude,
             ImagemConfirmacao.longitude,
             ConfirmacaoServico.data_servico,
@@ -24,12 +26,12 @@ def imagens_galeria_mapper(
         )
         .join(
             ConfirmacaoServico,
-            ConfirmacaoServico.id == ImagemConfirmacao.confirmacao_id
+            ConfirmacaoServico.id == ImagemConfirmacao.confirmacao_id,
         )
         .filter(ImagemConfirmacao.imagem.isnot(None))
     )
 
-    # 🔹 Filtros opcionais (aplicados ANTES do cursor)
+
     if tipo_servico:
         query = query.filter(ConfirmacaoServico.tipo_servico == tipo_servico)
 
@@ -39,24 +41,17 @@ def imagens_galeria_mapper(
     if data_final:
         query = query.filter(ConfirmacaoServico.data_servico <= data_final)
 
-    # 🔹 Cursor DESC (buscar mais antigas)
+
     if cursor:
         query = query.filter(ImagemConfirmacao.id < cursor)
+    query = query.order_by(ImagemConfirmacao.id.desc()).limit(limit + 1)
 
-    # 🔹 Ordenação correta para galeria
-    query = query.order_by(ImagemConfirmacao.id.desc())
-
-    # 🔹 Busca +1 para saber se existe próxima página
-    resultados = query.limit(limit + 1).all()
+    resultados = query.all()
 
     has_more = len(resultados) > limit
     resultados = resultados[:limit]
-
-    lista_imagens = []
-    next_cursor = None
-
-    for item in resultados:
-        lista_imagens.append({
+    lista_imagens = [
+        {
             "imagem_id": item.imagem_id,
             "imagem": item.imagem,
             "confirmacao_id": item.confirmacao_id,
@@ -65,8 +60,10 @@ def imagens_galeria_mapper(
             "data_servico": item.data_servico,
             "tipo_servico": item.tipo_servico,
             "responsavel": item.nome_vistoriador,
-        })
-        next_cursor = item.imagem_id  
+        }
+        for item in resultados
+    ]
+    next_cursor = resultados[-1].imagem_id if resultados else None
 
     return {
         "data": lista_imagens,
