@@ -1,34 +1,43 @@
 import logging
 from datetime import date, datetime
-from typing import Sequence,List
+from typing import Sequence, List
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from src.domain.models.relatorio_confirmacao import RelatorioConfirmacao
 from src.domain.models.confirmacao_servico import ConfirmacaoServico
-from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger("relatorio_mapper")
 
-
+#### validar confirmacao(move pra camada utils)
 def _is_confirmacao_valida(c: ConfirmacaoServico) -> bool:
     campos_faltando = [
-        campo for campo, valor in [
+        campo
+        for campo, valor in (
             ("tag_doc", c.tag_doc),
             ("nome_vistoriador", c.nome_vistoriador),
             ("tipo_servico", c.tipo_servico),
             ("data_servico", c.data_servico),
-        ] if not valor
+        )
+        if not valor
     ]
-    
+
     if campos_faltando:
-        logger.info("Confirmação ignorada (campos faltando: %s) - tag_doc=%s", 
-                    ", ".join(campos_faltando), getattr(c, "tag_doc", "desconhecida"))
+        logger.info(
+            "Confirmação ignorada (campos faltando: %s) - tag_doc=%s",
+            ", ".join(campos_faltando),
+            getattr(c, "tag_doc", "desconhecida"),
+        )
         return False
+
     return True
 
 
-def mapear_confirmacoes_validas(confirmacoes: Sequence[ConfirmacaoServico]) -> list[dict]:
-    confirmacoes_validas = [c for c in confirmacoes if _is_confirmacao_valida(c)]
+def mapear_confirmacoes_validas(
+    confirmacoes: Sequence[ConfirmacaoServico],
+) -> list[dict]:
+    confirmacoes_validas = [
+        c for c in confirmacoes if _is_confirmacao_valida(c)
+    ]
 
     if not confirmacoes_validas:
         raise HTTPException(
@@ -36,38 +45,40 @@ def mapear_confirmacoes_validas(confirmacoes: Sequence[ConfirmacaoServico]) -> l
             detail=(
                 "Nenhuma confirmação com dados completos foi encontrada. "
                 "Verifique tag_doc, nome_vistoriador, tipo_servico e data_servico."
-            )
+            ),
         )
 
     logger.info(
         "Filtragem de confirmações: %d válidas de %d totais",
-        len(confirmacoes_validas), len(confirmacoes)
+        len(confirmacoes_validas),
+        len(confirmacoes),
     )
 
     BASE_URL = "/static/imagens/"
-
-    lista_mapeada = []
+    lista_mapeada: list[dict] = []
 
     for c in confirmacoes_validas:
-        lista_mapeada.append({
-            "id": c.id,
-            "tag_doc": c.tag_doc,
-            "tipo_servico": c.tipo_servico,
-            "data_servico": (
-                c.data_servico.isoformat() if c.data_servico else None
-            ),
-            "imagens": [
-                {
-                    "id": img.id,
-                    "url": f"{BASE_URL}{img.imagem}"
-                }
-                for img in (c.imagens or [])
-            ]
-        })
+        imagens = [
+            {
+                "id": img.id,
+                "url": f"{BASE_URL}{img.imagem}",
+            }
+            for img in (c.imagens or [])
+        ]
 
-    # AQUI É O QUE ESTAVA ERRADO
+        lista_mapeada.append(
+            {
+                "id": c.id,
+                "tag_doc": c.tag_doc,
+                "tipo_servico": c.tipo_servico,
+                "data_servico": c.data_servico.isoformat()
+                if c.data_servico
+                else None,
+                "imagens": imagens,
+            }
+        )
+
     return lista_mapeada
-
 
 
 def calcular_total_imagens(confirmacoes: Sequence[dict]) -> int:
@@ -75,21 +86,27 @@ def calcular_total_imagens(confirmacoes: Sequence[dict]) -> int:
     logger.debug("Total de imagens calculado: %d", total)
     return total
 
+
 def gerar_observacao_relatorio(
     total_confirmacoes: int,
     total_imagens: int,
     data_inicial: date | None = None,
     data_final: date | None = None,
 ) -> str:
-    partes = [f"RELATÓRIO COMPLETO - {total_confirmacoes} confirmações, {total_imagens} imagens"]
+    partes = [
+        f"RELATÓRIO COMPLETO - {total_confirmacoes} confirmações, {total_imagens} imagens"
+    ]
 
     if data_inicial or data_final:
         if data_inicial and data_final:
-            periodo = f"Período: {data_inicial:%d/%m/%Y} a {data_final:%d/%m/%Y}"
+            periodo = (
+                f"Período: {data_inicial:%d/%m/%Y} a {data_final:%d/%m/%Y}"
+            )
         elif data_inicial:
             periodo = f"A partir de: {data_inicial:%d/%m/%Y}"
         else:
             periodo = f"Até: {data_final:%d/%m/%Y}"
+
         partes.append(periodo)
 
     partes.append(datetime.now().strftime("%d/%m/%Y %H:%M"))
@@ -112,7 +129,7 @@ def mapear_dados_relatorio(
         "observacao": relatorio.observacao,
     }
 
-### criar relatorio
+
 def criar_relatorio_confirmacao(
     db: Session,
     primeira_tag: str,
@@ -122,13 +139,20 @@ def criar_relatorio_confirmacao(
         confirmacao_tag=primeira_tag,
         observacao=observacao,
     )
+
     db.add(relatorio)
     db.commit()
     db.refresh(relatorio)
-    
-    logger.info("Relatório criado com sucesso - ID: %d | Primeira tag: %s", relatorio.id, primeira_tag)
+
+    logger.info(
+        "Relatório criado com sucesso - ID: %d | Primeira tag: %s",
+        relatorio.id,
+        primeira_tag,
+    )
+
     return relatorio
-#### excluir imagens("seleciona ela e apaga")
+
+##### service toda agora realmente retira a deletada do backmarch 
 def filtrar_imagens_excluidas(
     confirmacoes: Sequence[ConfirmacaoServico],
     ids_excluir: List[int],
@@ -137,57 +161,75 @@ def filtrar_imagens_excluidas(
         return list(confirmacoes)
 
     ids_set = set(ids_excluir)
-    resultado = []
+    resultado: List[ConfirmacaoServico] = []
     total_removidas = 0
 
-    for conf in confirmacoes:
-        # === CRIA UMA CÓPIA LIMPA DA CONFIRMAÇÃO SEM NENHUM RASTRO DO SQLALCHEMY ===
-        nova_conf = ConfirmacaoServico()
+    campos_para_copiar = [
+        "id",
+        "tag_doc",
+        "nome_vistoriador",
+        "tipo_servico",
+        "data_servico",
+        "observacao",
+        "status",
+        "created_at",
+        "updated_at",
+    ]
 
-        # Copia todos os campos escalares (strings, datas, números, etc.)
-        campos_para_copiar = [
-            "id", "tag_doc", "nome_vistoriador", "tipo_servico", "data_servico",
-            "observacao", "status", "created_at", "updated_at",
-            # adicione aqui qualquer outro campo que sua model tenha
-        ]
+    for conf in confirmacoes:
+        if not conf.imagens:
+            resultado.append(conf)
+            continue
+
+        imagens_mantidas = []
+        houve_remocao = False
+
+        for img in conf.imagens:
+            if img.id in ids_set:
+                houve_remocao = True
+                total_removidas += 1
+                logger.info(
+                    "Imagem ID %d excluída do relatório (tag_doc: %s)",
+                    img.id,
+                    conf.tag_doc or "sem_tag",
+                )
+            else:
+                imagens_mantidas.append(img)
+
+        if not houve_remocao:
+            resultado.append(conf)
+            continue
+
+        nova_conf = ConfirmacaoServico()#### agora cria apenas um objeto 
 
         for campo in campos_para_copiar:
             if hasattr(conf, campo):
                 setattr(nova_conf, campo, getattr(conf, campo))
-        if conf.imagens:
-            imagens_mantidas = []
-            for img in conf.imagens:
-                if img.id not in ids_set:
-                    imagens_mantidas.append(img)  
-                else:
-                    total_removidas += 1
-                    logger.info("Imagem ID %d excluída do relatório (tag_doc: %s)", img.id, conf.tag_doc or "sem_tag")
 
-            nova_conf.imagens = imagens_mantidas
-        else:
-            nova_conf.imagens = []
-
+        nova_conf.imagens = imagens_mantidas 
         resultado.append(nova_conf)
 
     logger.info("Total de imagens excluídas do PDF: %d", total_removidas)
     return resultado
 
 
+
 def get_imagens_modal(db: Session) -> list[dict]:
-    c = (
+    confirmacoes = (
         db.query(ConfirmacaoServico)
         .options(joinedload(ConfirmacaoServico.imagens))
         .order_by(ConfirmacaoServico.data_servico.desc())
         .all()
     )
 
-    imagens_lista = []  
+    imagens_lista: list[dict] = []
 
-    for conf in c:  
-        for img in conf.imagens or []:  
-            imagens_lista.append({
-                "imagem_id": img.id,
-            })
+    for conf in confirmacoes:
+        for img in conf.imagens or []:
+            imagens_lista.append(
+                {
+                    "imagem_id": img.id,
+                }
+            )
 
     return imagens_lista
-   

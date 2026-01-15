@@ -29,3 +29,10 @@ def get_images_paths(images: Optional[List[str]]) -> List[str]:
         return []
     base = BASE_IMAGE_PATH
     return [f"{base}/{f}" for f in files]
+
+def otimizar_url_imagem(url: str | None) -> str | None:
+    if not url:
+        return None
+
+    # ajuste conforme o storage
+    return f"{url}?w=800&q=80&format=webp"

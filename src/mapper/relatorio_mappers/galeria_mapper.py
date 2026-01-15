@@ -1,9 +1,14 @@
 from datetime import date
 from sqlalchemy.orm import Session
-from src.domain.models.imagem_confirmacao import ConfirmacaoServico, ImagemConfirmacao
+from sqlalchemy import asc, desc
+from src.domain.models.imagem_confirmacao import (
+    ConfirmacaoServico,
+    ImagemConfirmacao,
+)
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 def imagens_galeria_mapper(
     db: Session,
@@ -12,7 +17,21 @@ def imagens_galeria_mapper(
     data_inicial: date | None = None,
     data_final: date | None = None,
     limit: int = 50,
+    order_by: str = "imagem_id",
+    order_dir: str = "desc",
 ):
+
+    ORDER_BY_MAP = {
+        "imagem_id": ImagemConfirmacao.id,
+        "data_servico": ConfirmacaoServico.data_servico,
+        "tipo_servico": ConfirmacaoServico.tipo_servico,
+        "responsavel": ConfirmacaoServico.nome_vistoriador,
+    }
+
+
+    order_column = ORDER_BY_MAP.get(order_by, ImagemConfirmacao.id)
+    order_func = desc if order_dir.lower() == "desc" else asc
+
     query = (
         db.query(
             ImagemConfirmacao.id.label("imagem_id"),
@@ -31,7 +50,6 @@ def imagens_galeria_mapper(
         .filter(ImagemConfirmacao.imagem.isnot(None))
     )
 
-
     if tipo_servico:
         query = query.filter(ConfirmacaoServico.tipo_servico == tipo_servico)
 
@@ -41,15 +59,18 @@ def imagens_galeria_mapper(
     if data_final:
         query = query.filter(ConfirmacaoServico.data_servico <= data_final)
 
-
+    # Cursor pagination (mantida)
     if cursor:
         query = query.filter(ImagemConfirmacao.id < cursor)
-    query = query.order_by(ImagemConfirmacao.id.desc()).limit(limit + 1)
+
+    # 🔐 ORDER BY SEGURO
+    query = query.order_by(order_func(order_column)).limit(limit + 1)
 
     resultados = query.all()
 
     has_more = len(resultados) > limit
     resultados = resultados[:limit]
+
     lista_imagens = [
         {
             "imagem_id": item.imagem_id,
@@ -63,8 +84,8 @@ def imagens_galeria_mapper(
         }
         for item in resultados
     ]
-    next_cursor = resultados[-1].imagem_id if resultados else None
 
+    next_cursor = resultados[-1].imagem_id if resultados else None
     return {
         "data": lista_imagens,
         "next_cursor": next_cursor,

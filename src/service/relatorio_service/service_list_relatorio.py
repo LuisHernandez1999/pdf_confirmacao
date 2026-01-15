@@ -2,9 +2,9 @@ import logging
 from datetime import date
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
+from collections import defaultdict
 from src.utils.relatorio_utils.relatorio_utils import normalizar_data
 from src.domain.models.confirmacao_servico import ConfirmacaoServico
-from collections import defaultdict
 from src.mapper.relatorio_mappers.galeria_mapper import imagens_galeria_mapper
 from src.utils.relatorio_utils.relatorio_pdf_utils import (
     setup_logger,
@@ -14,11 +14,12 @@ from src.utils.relatorio_utils.relatorio_pdf_utils import (
 )
 from src.mapper.relatorio_mappers.relatorio_mapper import (
     mapear_confirmacoes_validas,
-
 )
+# from src.utils.imagem_utils import otimizar_url_imagem
 
 logger = logging.getLogger("relatorio_service")
 setup_logger()
+
 
 def gerar_relatorios_completos(
     db: Session,
@@ -49,6 +50,10 @@ def gerar_relatorios_completos(
     )
 
     imagens = resultado["data"]
+
+    # for img in imagens:
+    #     img["imagem"] = otimizar_url_imagem(img["imagem"])
+
     if not imagens:
         raise HTTPException(status_code=404, detail="Nenhum registro encontrado")
 
@@ -66,7 +71,9 @@ def gerar_relatorios_completos(
             bloco["tipo_servico"] = img["tipo_servico"]
             bloco["data_servico"] = img["data_servico"]
 
-        bloco["imagens"].append({"imagem_id": img["imagem_id"]})
+        bloco["imagens"].append({
+            "imagem_id": img["imagem_id"]
+        })
 
     return {
         "data_inicial": data_inicial,
@@ -78,7 +85,6 @@ def gerar_relatorios_completos(
         "has_more": resultado["has_more"],
         "limit": limit,
     }
-
 
 
 def gerar_pdf_relatorio_completo(
@@ -110,7 +116,10 @@ def gerar_pdf_relatorio_completo(
 
     confirmacoes = query.all()
     if not confirmacoes:
-        raise HTTPException(status_code=404, detail="Nenhuma confirmação encontrada")
+        raise HTTPException(
+            status_code=404,
+            detail="Nenhuma confirmação encontrada"
+        )
 
     confirmacoes_validas = mapear_confirmacoes_validas(confirmacoes)
 
