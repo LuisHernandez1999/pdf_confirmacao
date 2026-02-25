@@ -1,21 +1,26 @@
 import logging
-from datetime import date
+from datetime import date, datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session, joinedload
 from collections import defaultdict
+
 from src.utils.relatorio_utils.relatorio_utils import normalizar_data
 from src.domain.models.confirmacao_servico import ConfirmacaoServico
+
 from src.mapper.relatorio_mappers.galeria_mapper import imagens_galeria_mapper
+from src.mapper.relatorio_mappers.relatorio_mapper import (
+    mapear_confirmacoes_validas,
+)
+
 from src.utils.relatorio_utils.relatorio_pdf_utils import (
     setup_logger,
     expandir_confirmacoes_em_cards_imagem,
     aplicar_filtros_query,
-    criar_pdf_visual
+    criar_pdf_visual,
 )
-from src.mapper.relatorio_mappers.relatorio_mapper import (
-    mapear_confirmacoes_validas,
-)
-# from src.utils.imagem_utils import otimizar_url_imagem
+
+from src.core.storage.r2_storage import R2StorageService
+
 
 logger = logging.getLogger("relatorio_service")
 setup_logger()
@@ -50,9 +55,6 @@ def gerar_relatorios_completos(
     )
 
     imagens = resultado["data"]
-
-    # for img in imagens:
-    #     img["imagem"] = otimizar_url_imagem(img["imagem"])
 
     if not imagens:
         raise HTTPException(status_code=404, detail="Nenhum registro encontrado")
@@ -93,7 +95,11 @@ def gerar_pdf_relatorio_completo(
     data_final: date | None = None,
     tipo_servico: str | None = None,
     imagens_excluir: list[int] | None = None,
-) -> bytes:
+) -> dict:
+    """
+    Gera o PDF do relatório, faz upload no Cloudflare R2
+    e retorna a URL pública do arquivo.
+    """
 
     data_inicial = normalizar_data(data_inicial)
     data_final = normalizar_data(data_final)
@@ -152,8 +158,29 @@ def gerar_pdf_relatorio_completo(
         data_inicial=data_inicial,
         data_final=data_final,
         total_confirmacoes=len(confirmacoes_validas),
-        total_imagens=total_cards
+        total_imagens=total_cards,
     )
 
     logger.info("✅ PDF gerado com sucesso")
-    return pdf_buffer.getvalue()
+
+    # ☁️ Upload para Cloudflare R2
+    logger.info("☁️ Enviando PDF para o Cloudflare R2")
+
+    storage = R2StorageService()
+
+    now = datetime.utcnow()
+    filename = f"relatorio_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
+    key = f"pdfs/relatorios/{now.year}/{now.month:02d}/{filename}"
+
+    pdf_url = storage.upload_bytes(
+        content=pdf_buffer.getvalue(),
+        key=key,
+    )
+
+    logger.info(f"📎 PDF disponível em: {pdf_url}")
+
+    return {
+        "pdf_url": pdf_url,
+        "total_confirmacoes": len(confirmacoes_validas),
+        "total_imagens": total_cards,
+    }

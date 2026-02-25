@@ -32,9 +32,6 @@ def listar_confi_tabela(
     except Exception:
         raise HTTPException(status_code=500, detail="erro ao carregar confirmacoes")
     
-
-
-
 def galeria_imgs_service(
     db:Session,
     cursor:int,
